@@ -832,5 +832,29 @@ CALL :print_mariadb_version
 PAUSE
 GOTO mysql_menu
 
+:mysql_set_default_version
+ECHO Getting installed MariaDB versions...
+CALL :get_local_mariadb_versions
+FOR /L %%i IN (1,1,%mariadb_local_versions_count%) DO (
+	ECHO MariaDB-!mariadb_local_versions[%%i]!
+)
+SET /p choosen_mariadb_version=Set MariaDB version as default: 
+SET installed=false
+FOR /L %%i IN (1,1,%mariadb_local_versions_count%) DO (
+	IF !mariadb_local_versions[%%i]! == !choosen_mariadb_version! (
+		SET installed=true
+	)
+)
+IF "%installed%" == "false" (
+	ECHO MariaDB-!choosen_mariadb_version! is not installed.
+	PAUSE
+	GOTO mysql_menu
+)
+ECHO Update default MariaDB version...
+POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'mariadb=(mariadb-([0-9.]*))?', 'mariadb=mariadb-!choosen_mariadb_version!' | Set-Content .\\default.conf"
+CALL :mariadb_create_default_bin
+PAUSE
+GOTO mysql_menu
+
 :exit
 exit /b 0
