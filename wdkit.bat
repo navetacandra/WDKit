@@ -157,6 +157,107 @@ FOR /L %%i IN (1,1,%php_local_versions_count%) DO (
 )
 EXIT /b
 
+:dowload_and_install_php
+CALL :print_php_versions
+SET /p choosen_php_version=Download PHP Version: 
+SET archived=true
+
+ECHO Validating version..
+
+SET valid_version=false
+FOR /L %%i IN (1,1,%php_net_versions_count%) DO (
+	IF "!php_net_versions[%%i]!" == "%choosen_php_version%" (
+		SET installed=false
+		FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
+			IF "!php_net_versions[%%i]!" == "!php_local_versions[%%j]!" (
+				SET installed=true
+			)
+		)
+
+		IF "!installed!"=="true" (
+			ECHO PHP-%choosen_php_version% already installed.
+			PAUSE
+			GOTO :php_menu
+		) ELSE (
+			SET valid_version=true
+		)
+	)
+)
+
+IF NOT "%valid_version%" == "true" (
+	ECHO PHP version is invalid or not found at repository.
+	PAUSE
+	GOTO php_menu
+)
+
+FOR /L %%i (1,1, %php_release_versions%) DO (
+	IF "!php_release_versions[%%i]!" == "%choosen_php_version%" (
+		SET archived=false
+	)
+)
+
+IF "%archived%" == "true" (
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://windows.php.net/downloads/releases/archives/ -OutFile .\\tmp\\php_repos.html"
+	POWERSHELL -Command "$content=Get-Content -Path .\\tmp\\php_repos.html | Out-String; $matches=[regex]::matches($content, '/downloads/releases/archives/php-!choosen_php_version!-Win32-(vc|vs|VC|VS)\d+-x(86|64).zip'); $versions=@(); foreach($match in $matches) { $versions+=$match.Value }; Write-Output $versions" > .\\tmp\temp.txt
+) ELSE (
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://windows.php.net/downloads/releases/ -OutFile .\\tmp\\php_repos.html"
+	POWERSHELL -Command "$content=Get-Content -Path .\\tmp\\php_repos.html | Out-String; $matches=[regex]::matches($content, '/downloads/releases/php-!choosen_php_version!-Win32-(vc|vs|VC|VS)\d+-x(86|64).zip'); $versions=@(); foreach($match in $matches) { $versions+=$match.Value }; Write-Output $versions" > .\\tmp\temp.txt
+)
+IF EXIST .\\tmp\\php_repos.html (
+	DEL .\\tmp\\php_repos.html
+)
+
+SET count=0
+FOR /f "delims=" %%a IN (.\\tmp\\temp.txt) DO (
+	IF NOT "%%a" == "" (
+		SET /a count+=1
+	)
+)
+
+IF !count! LSS 1 (
+	ECHO Failed get download URL
+	PAUSE
+	GOTO php_menu
+)
+
+IF NOT EXIST .\\tmp\\php-!choosen_php_version!.zip (
+	SET arch=x64
+	ECHO Downloading PHP-%choosen_php_version%...
+	IF "%PROCESSOR_ARCHITECTURE%"=="x86" (
+		SET arch=x86
+	)
+			
+	SET /p download_path=<.\\tmp\temp.txt
+	IF !count! GTR 1 (
+		POWERSHELL -Command "$content=Get-Content -Path .\\tmp\\temp.txt | Out-String; $matches=[regex]::matches($content, '.+-!arch!.zip'); Write-Output $matches[0].Value" > .\\tmp\\temp.txt
+		SET /p download_path=<.\\tmp\temp.txt
+	)
+			
+	DEL .\\tmp\\temp.txt
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://windows.php.net%download_path% -OutFile .\\tmp\\php-!choosen_php_version!.zip"
+)
+
+ECHO Unzipping...
+CALL :unzipper ".\\tmp\\php-!choosen_php_version!.zip" ".\\php\\php-!choosen_php_version!\\"
+IF EXIST .\\php\\php-!choosen_php_version!\\php.exe (
+	IF EXIST .\\php\\php-!choosen_php_version!\\php.ini-dist (
+		COPY .\\php\\php-!choosen_php_version!\\php.ini-dist .\\php\\php-!choosen_php_version!\\php.ini
+	)
+	IF EXIST .\\php\\php-!choosen_php_version!\\php.ini-production (
+		COPY .\\php\\php-!choosen_php_version!\\php.ini-production .\\php\\php-!choosen_php_version!\\php.ini
+	)
+	ECHO PHP !choosen_php_version! installed.
+	ECHO Update default php version...
+	CALL :create_default_php_bin
+) ELSE (
+	IF EXIST .\\php\\php-!choosen_php_version! (
+		RMDIR /S /Q .\\php\\php-!choosen_php_version!
+	)
+	ECHO PHP !choosen_php_version! failed to install.
+)
+PAUSE
+GOTO php_menu
+
 :php_version
 CALL :print_php_versions
 PAUSE
