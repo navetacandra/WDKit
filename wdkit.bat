@@ -544,7 +544,7 @@ IF EXIST .\\apache\\bin\\httpd.exe (
 		"$content=[regex]::Replace($content, '#ServerName www.example.com:80', 'ServerName localhost:80');" ^
 		"$content=[regex]::Replace($content, '\${SRVROOT}/htdocs', '%CD%\\htdocs');" ^
 		"$content=[regex]::Replace($content, 'DirectoryIndex index.html', 'DirectoryIndex index.php index.html index.htm');" ^
-		"$content=[regex]::Replace($content, \"^<IfModule mime_module^>\", \"^<IfModule mime_module^>`n    AddHandler application/x-httpd-php .php .phar\");" ^
+		"$content=[regex]::Replace($content, \"^<IfModule mime_module^>\", \"^<IfModule mime_module^>`n	AddHandler application/x-httpd-php .php .phar\");" ^
 		"Write-Output $content | Set-Content -Path .\\apache\\conf\\httpd.conf"
 	CALL :apache_set_php_module
 	ECHO Apache installed.
@@ -841,19 +841,19 @@ POWERSHELL -Command ^
 	"$closest_mirrors=$data.release_data.closest_mirrors;" ^
 	"$avail_mirrors=@();" ^
 	"foreach($fm in $file_mirrors) {" ^
-	"    foreach($prop in $fm.PSObject.Properties) {" ^
-	"        foreach($child in $prop.Value.children) {" ^
-	"            $mirror=@{};" ^
-	"            $mirror.country=$child.country;" ^
-	"            $mirror.url=$child.mirror_url;" ^
-	"            $avail_mirrors+=$mirror;" ^
-	"        }" ^
-	"    }" ^
+	"	foreach($prop in $fm.PSObject.Properties) {" ^
+	"		foreach($child in $prop.Value.children) {" ^
+	"			$mirror=@{};" ^
+	"			$mirror.country=$child.country;" ^
+	"			$mirror.url=$child.mirror_url;" ^
+	"			$avail_mirrors+=$mirror;" ^
+	"		}" ^
+	"	}" ^
 	"}" ^
 	"$matched_mirrors = @();" ^
 	"foreach ($cm in $closest_mirrors) {" ^
-	"    $match = $avail_mirrors | Where-Object { $_.url -eq $cm.mirror_url };" ^
-	"    if ($match) { $matched_mirrors += $match }" ^
+	"	$match = $avail_mirrors | Where-Object { $_.url -eq $cm.mirror_url };" ^
+	"	if ($match) { $matched_mirrors += $match }" ^
 	"}" ^
 	"Write-Output $matched_mirrors[0].url | Set-Content -Path .\\tmp\\temp.txt"
 SET /p mirror_url=<.\\tmp\\temp.txt
@@ -866,13 +866,13 @@ POWERSHELL -Command ^
 	"$files=$data.release_data.files;" ^
 	"$file_path='';" ^
 	"foreach($file in $files) {" ^
-	"    if($file.os_code -eq 'windows' -and $file.package_type_code -eq 'zip' -and $file.cpu -eq $arch_code) {" ^
-	"        $matches=[regex]::matches($file.file_name, 'win(.+)\.zip');" ^
-	"        $m=$matches.Groups[1];" ^
-	"        if(($m -replace '-','') -eq $m) {" ^
-	"            $file_path=$file.full_path;" ^
-	"        }" ^
-	"    }" ^
+	"	if($file.os_code -eq 'windows' -and $file.package_type_code -eq 'zip' -and $file.cpu -eq $arch_code) {" ^
+	"		$matches=[regex]::matches($file.file_name, 'win(.+)\.zip');" ^
+	"		$m=$matches.Groups[1];" ^
+	"		if(($m -replace '-','') -eq $m) {" ^
+	"			$file_path=$file.full_path;" ^
+	"		}" ^
+	"	}" ^
 	"}" ^
 	"Write-Output $file_path | Set-Content .\\tmp\\temp.txt;"
 SET /p file_path=<.\\tmp\\temp.txt
