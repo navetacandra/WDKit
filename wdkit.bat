@@ -927,5 +927,55 @@ CALL :mariadb_status
 PAUSE
 GOTO mysql_menu
 
+:mysql_uninstall
+CALL :get_local_mariadb_versions
+FOR /L %%j IN (1,1,!mariadb_local_versions_count!) DO (
+	ECHO MariaDB-!mariadb_local_versions[%%j]!
+)
+
+SET /p choosen_mariadb_version=Uninstall MariaDB Version: 
+SET installed=false
+FOR /L %%j IN (1,1,!mariadb_local_versions_count!) DO (
+	IF !mariadb_local_versions[%%j]! == !choosen_mariadb_version! (
+		SET installed=true
+	)
+)
+
+IF "!installed!" == "false" (
+	ECHO MariaDB-!choosen_mariadb_version! is not installed.
+	PAUSE
+	GOTO mysql_menu
+)
+
+SET y=false
+SET /p continue=Do you want continue uninstall MariaDB-!choosen_mariadb_version! [Y/N]?
+IF "!continue!" == "y" (
+	SET y=true
+) ELSE IF "!continue!" == "Y" (
+	SET y=true
+)
+	
+IF "!y!" == "true" (
+	POWERSHELL -Command "tasklist | findstr /i mysqld | Select-Object -First 1" > .\\tmp\temp.txt
+	SET count=0
+	FOR /f %%a IN (.\\tmp\temp.txt) DO (
+		SET /a count+=1
+	)
+	DEL .\\tmp\temp.txt
+	IF !count! GTR 0 (
+		POWERSHELL -Command "Stop-Process -Id (Get-Process -Name mysqld).Id -Force"
+	)
+	IF EXIST .\\mariadb\\mariadb-!choosen_mariadb_version! (
+		RMDIR /S /Q .\\mariadb\\mariadb-!choosen_mariadb_version!
+	)
+	ECHO Update MariaDB default version...
+	CALL :mariadb_create_default_bin
+	ECHO MariaDB-!choosen_mariadb_version! uninstalled.
+) ELSE (
+	ECHO Uninstallation cancelled.
+)
+PAUSE
+GOTO mysql_menu
+
 :exit
 exit /b 0
