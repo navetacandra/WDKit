@@ -157,6 +157,55 @@ FOR /L %%i IN (1,1,%php_local_versions_count%) DO (
 )
 EXIT /b
 
+:create_default_php_bin
+CALL :get_local_php_versions
+POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'php=php-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"php-$ver\"} else {Write-Output php-0.0.0}" > .\\tmp\\temp.txt
+SET /p php_ver=<.\\tmp\\temp.txt
+DEL .\\tmp\\temp.txt
+
+IF EXIST .\\php\\bin (
+	RMDIR /S /Q .\\php\\bin
+)
+MKDIR .\\php\\bin
+
+IF "%php_ver%"=="php-0.0.0" (
+	IF %php_local_versions_count% GTR 0 (
+		SET php_ver=php-!php_local_versions[%php_local_versions_count%]!
+		POWERSHELL -Command "FINDSTR /i 'php=' default.conf" > .\\tmp\temp.txt
+		SET /p  php_line_conf=<.\\tmp\temp.txt
+		IF "%php_line_conf%" == "" (
+			ECHO php=php-!php_local_versions[%php_local_versions_count%]! >> default.conf
+		) ELSE (
+			POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-!php_local_versions[%php_local_versions_count%]!' | Set-Content .\\default.conf"
+		)
+	) ELSE (
+		ECHO PHP not installed.
+		PAUSE
+		GOTO php_menu
+	)
+)
+
+SET php_path=0
+FOR /L %%i IN (1,1,%php_local_versions_count%) DO (
+	IF "php-!php_local_versions[%%i]!"=="%php_ver%" (
+		IF EXIST .\\php\\php-!php_local_versions[%%i]! (
+			SET php_path=%CD%\\php\\php-!php_local_versions[%%i]!
+		)
+	)
+)
+IF %php_path% NEQ 0 (
+	POWERSHELL -Command "$content=Get-ChildItem -Path %php_path% | Where-Object {$_.Name -match '^.+\.(exe|bat)$'}; $apps=@(); foreach($c in $content) {$apps+=$c.Name}; Write-Output $apps" > .\\tmp\\temp.txt
+	FOR /F "delims=" %%a IN (.\\tmp\\temp.txt) DO (
+		POWERSHELL -Command "$matches=[regex]::matches('%%a', '^(.*)\.(exe|bat)'); $fname=$matches.Groups[1].Value; Write-Output \"@echo off`n!php_path!\%%a !%%*\" | Out-File -FilePath \".\php\bin\$fname.bat\" -Encoding ASCII"
+	)
+	CALL :apache_php_module
+	ECHO %php_ver% set as default.
+) ELSE (
+	POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-!php_local_versions[%php_local_versions_count%]!' | Set-Content .\\default.conf"
+	GOTO create_default_php_bin
+)
+EXIT /b
+
 :dowload_and_install_php
 CALL :print_php_versions
 SET /p choosen_php_version=Download PHP Version: 
@@ -262,6 +311,30 @@ GOTO php_menu
 CALL :print_php_versions
 PAUSE
 GOTO php_menu
+
+:set_default_php_version
+ECHO Getting installed PHP versions...
+CALL :get_local_php_versions
+FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
+	ECHO PHP-!php_local_versions[%%j]!
+)
+SET /p choosen_php_version=Set PHP Version as default: 
+SET installed=false
+FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
+	IF !php_local_versions[%%j]! == %choosen_php_version% (
+		SET installed=true
+	)
+)
+
+IF "%installed%" == "true" (
+	ECHO Update default php version...
+	POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-%choosen_php_version%' | Set-Content .\\default.conf"
+	CALL :create_default_php_bin
+) ELSE (
+	ECHO PHP-%choosen_php_version% is not installed.
+)
+PAUSE
+GOTO :php_menu
 
 :apache_menu
 CLS
