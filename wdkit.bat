@@ -17,11 +17,35 @@ CD /d "%~dp0"
 
 GOTO :prepare_directory
 
+:print_menu_header
+SET title=%1
+FOR /f "tokens=2" %%a IN ('mode con ^| findstr /c:"Columns:"') DO SET "width=%%a"
+SET "length=0"
+FOR /l %%a IN (1,1,100) DO (
+    IF "!title:~%%a,1!"=="" (
+        SET /a "length=%%a-2"
+        GOTO :break
+    )
+)
+:break
+SET /a "center=(width / 2) - ((length-2) / 2)"
+SET border=
+FOR /L %%i IN (1,1,!width!) DO (
+	SET border=!border!=
+)
+SET space=
+FOR /L %%i IN (1,1,!center!) DO (
+	SET space=!space! 
+)
+
+ECHO !border!
+ECHO !space!!title:~1,%length%!
+ECHO !border!
+EXIT /b
+
 :main_menu
 CLS
-ECHO ========================================================
-ECHO					  MAIN MENU
-ECHO ========================================================
+CALL :print_menu_header "MAIN MENU"
 ECHO 1. PHP
 ECHO 2. Apache
 ECHO 3. MySQL/MariaDB
@@ -81,9 +105,7 @@ EXIT /b
 
 :php_menu
 CLS
-ECHO ========================================================
-ECHO					  PHP MENU
-ECHO ========================================================
+CALL :print_menu_header "PHP MENU"
 ECHO 1. Download and Install
 ECHO 2. List Version
 ECHO 3. Set Default Version
@@ -408,9 +430,7 @@ GOTO :php_menu
 
 :apache_menu
 CLS
-ECHO ========================================================
-ECHO					  APACHE MENU
-ECHO ========================================================
+CALL :print_menu_header "APACHE MENU"
 CALL :apache_status
 ECHO 1. Download and Install
 ECHO 2. Start
@@ -480,7 +500,7 @@ IF !count! GTR 0 (
 EXIT /b
 
 :apache_install
-CALL :download_file "https://www.apachelounge.com/download/" ".\\tmp\\apachelounge.html"
+POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://www.apachelounge.com/download/ -OutFile .\\tmp\\apachelounge.html"
 POWERSHELL -Command " $content=Get-Content -Path .\\tmp\\apachelounge.html | Out-String; $matches=[regex]::matches($content, 'Apache ([0-9\.]+) .+ Windows Binaries and Modules'); $ver=$matches.Groups[1].Value -replace '\.', ''; Write-Output \"Apache$ver\"" > .\\tmp\\temp.txt
 SET /p apache_version=<.\\tmp\\temp.txt
 DEL .\\tmp\\temp.txt
@@ -512,10 +532,8 @@ IF NOT EXIST .\\tmp\\apache.zip (
 		SET /p download_path=<.\\tmp\temp.txt
 	)
 	DEL .\\tmp\\temp.txt
-	
 	POWERSHELL -Command "$res=Invoke-WebRequest -Method HEAD -Uri 'https://www.apachelounge.com!download_path!'; Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt"
 	SET /p filesize=<.\\tmp\\temp.txt
-	DEL .\\tmp\\temp.txt
 	SET y=false
 	SET /p continue=You need download !filesize! MiB file. Continue? [Y/N] 
 	IF "!continue!" == "y" (
@@ -653,9 +671,7 @@ GOTO apache_menu
 
 :mariadb_menu
 CLS
-ECHO ========================================================
-ECHO					  MYSQL MENU
-ECHO ========================================================
+CALL :print_menu_header "MARIADB MENU"
 CALL :mariadb_status
 ECHO 1. Download and Install
 ECHO 2. List Version
