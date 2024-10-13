@@ -508,6 +508,51 @@ IF EXIST .\\tmp\\apache.zip (
 PAUSE
 GOTO apache_menu
 
+:apache_start
+POWERSHELL -Command "tasklist | findstr /i httpd | Select-Object -First 1" > .\\tmp\temp.txt
+SET count=0
+FOR /f %%a IN (.\\tmp\temp.txt) DO (
+	SET /a count+=1
+)
+DEL .\\tmp\temp.txt
+IF !count!==0 (
+	IF EXIST .\\apache\\bin\\httpd.exe (START /min /b .\\apache\\bin\\httpd.exe)
+) ELSE (
+	ECHO Apache already started
+)
+CALL :apache_status
+PAUSE
+GOTO apache_menu
+
+:apache_stop
+POWERSHELL -Command "tasklist | findstr /i httpd | Select-Object -First 1" > .\\tmp\temp.txt
+SET count=0
+FOR /f %%a IN (.\\tmp\temp.txt) DO (
+	SET /a count+=1
+)
+DEL .\\tmp\temp.txt
+IF !count! GTR 0 (
+	POWERSHELL -Command "Stop-Process -Id (Get-Process -Name httpd).Id -Force"
+)
+CALL :apache_status
+PAUSE
+GOTO apache_menu
+
+:apache_restart
+POWERSHELL -Command "tasklist | findstr /i httpd | Select-Object -First 1" > .\\tmp\temp.txt
+SET count=0
+FOR /f %%a IN (.\\tmp\temp.txt) DO (
+	SET /a count+=1
+)
+DEL .\\tmp\temp.txt
+IF !count! GTR 0 (
+	POWERSHELL -Command "Stop-Process -Id (Get-Process -Name httpd).Id -Force"
+)
+IF EXIST .\\apache\\bin\\httpd.exe (START /min /b .\\apache\\bin\\httpd.exe)
+CALL :apache_status
+PAUSE
+GOTO apache_menu
+
 :mysql_menu
 CLS
 ECHO ========================================================
