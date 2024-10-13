@@ -216,7 +216,6 @@ ECHO Validating version..
 SET valid_version=false
 FOR /L %%i IN (1,1,%php_net_versions_count%) DO (
 	IF "!php_net_versions[%%i]!" == "%choosen_php_version%" (
-		SET installed=false
 		FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
 			IF "!php_net_versions[%%i]!" == "!php_local_versions[%%j]!" (
 				SET installed=true
@@ -239,8 +238,8 @@ IF NOT "%valid_version%" == "true" (
 	GOTO php_menu
 )
 
-FOR /L %%i (1,1, %php_release_versions%) DO (
-	IF "!php_release_versions[%%i]!" == "%choosen_php_version%" (
+FOR /L %%i IN (1,1,%php_net_release_versions_count%) DO (
+	IF "!php_net_release_versions[%%i]!" == "%choosen_php_version%" (
 		SET archived=false
 	)
 )
