@@ -1,14 +1,18 @@
 @echo off
 SETLOCAL EnableDelayedExpansion
 SET userAgent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.3
-SET php_local_versions_count=0
-SET php_net_versions_count=0
 SET php_net_archive_versions_count=0
 SET php_net_release_versions_count=0
-SET php_local_versions=
-SET php_net_versions=
+SET php_local_versions_count=0
+SET php_net_versions_count=0
 SET php_net_release_versions=
 SET php_net_archive_versions=
+SET php_local_versions=
+SET php_net_versions=
+SET mariadb_local_versions_count=0
+SET mariadb_net_versions_count=0
+SET mariadb_local_versions=
+SET mariadb_net_versions=
 CD /d "%~dp0"
 
 GOTO :prepare_directory
@@ -82,9 +86,9 @@ ECHO 5. Back
 CHOICE /C 12345 /M "Pilih menu"
 IF ERRORLEVEL 5 GOTO main_menu
 IF ERRORLEVEL 4 GOTO uninstall_php
-IF ERRORLEVEL 3 GOTO set_default_php_version
+IF ERRORLEVEL 3 GOTO php_set_default_version
 IF ERRORLEVEL 2 GOTO php_version
-IF ERRORLEVEL 1 GOTO dowload_and_install_php
+IF ERRORLEVEL 1 GOTO php_install
 PAUSE
 GOTO main_menu
 
@@ -206,7 +210,7 @@ IF %php_path% NEQ 0 (
 )
 EXIT /b
 
-:dowload_and_install_php
+:php_install
 CALL :print_php_versions
 SET /p choosen_php_version=Download PHP Version: 
 SET archived=true
@@ -311,7 +315,7 @@ CALL :print_php_versions
 PAUSE
 GOTO php_menu
 
-:set_default_php_version
+:php_set_default_version
 ECHO Getting installed PHP versions...
 CALL :get_local_php_versions
 FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
@@ -606,13 +610,24 @@ CLS
 ECHO ========================================================
 ECHO					  MYSQL MENU
 ECHO ========================================================
+CALL :mariadb_status
 ECHO 1. Download and Install
 ECHO 2. List Version
 ECHO 3. Set Default Version
-ECHO 4. Uninstall
-ECHO 5. Back
-CHOICE /C 12345 /M "Pilih menu"
-IF ERRORLEVEL 5 GOTO main_menu
+ECHO 4. Start
+ECHO 5. Restart
+ECHO 6. Stop
+ECHO 7. Uninstall
+ECHO 8. Back
+CHOICE /C 12345678 /M "Pilih menu"
+IF ERRORLEVEL 8 GOTO main_menu
+IF ERRORLEVEL 7 GOTO mysql_uninstall
+IF ERRORLEVEL 6 GOTO mariadb_stop
+IF ERRORLEVEL 5 GOTO mariadb_restart
+IF ERRORLEVEL 4 GOTO mariadb_start
+IF ERRORLEVEL 3 GOTO mysql_set_default_version
+IF ERRORLEVEL 2 GOTO mysql_version
+IF ERRORLEVEL 1 GOTO mysql_install
 PAUSE
 GOTO main_menu
 
