@@ -631,5 +631,73 @@ IF ERRORLEVEL 1 GOTO mysql_install
 PAUSE
 GOTO main_menu
 
+:get_local_mariadb_versions
+POWERSHELL -Command "$content = Get-ChildItem -Path '.\\mariadb' -Directory; $matches = [regex]::matches($content, 'mariadb-([0-9\.]+)'); $versions = @(); foreach($match in $matches) {$versions += $match.Groups[1].Value}; Write-Output $versions" > .\\tmp\\temp.txt
+SET mariadb_local_versions=
+SET mariadb_local_versions_count=0
+FOR /f "delims=" %%a IN (.\\tmp\\temp.txt) DO (
+	SET /a mariadb_local_versions_count += 1
+	SET "mariadb_local_versions[!mariadb_local_versions_count!]=%%a"
+)
+DEL .\\tmp\\temp.txt
+EXIT /b
+
+:get_net_mariadb_versions
+IF NOT !mariadb_net_versions_count! GTR 0 (
+	SET release_number_regex="release_number": "([0-9\.]+)"
+	POWERSHELL -Command "Invoke-WebRequest -Uri 'https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=true' -MaximumRedirection 5 -OutFile.\\tmp\\mariadb-ver.json"
+	POWERSHELL -Command ^
+	  "$content=Get-Content -Path .\\tmp\\mariadb-ver.json | Out-String;" ^
+	  "$matches=[regex]::matches($content, $Env:release_number_regex);" ^
+	  "$versions=@();" ^
+	  "foreach($match in $matches) { $versions+=$match.Groups[1].Value };" ^
+	  "Write-Output $versions | Sort-Object -Property {[version]$_.Trim()} | Set-Content -Path .\\tmp\\temp.txt"
+
+	FOR /f %%a IN (.\\tmp\\temp.txt) DO (
+	  SET /a mariadb_net_versions_count+=1
+	  SET "mariadb_net_versions[!mariadb_net_versions_count!]=%%a"
+	)
+	DEL .\\tmp\\mariadb-ver.json
+	DEL.\\tmp\\temp.txt
+)
+EXIT /b
+
+:print_mariadb_version
+ECHO Fetching MariaDB Versions...
+CALL :get_local_mariadb_versions
+CALL :get_net_mariadb_versions
+FOR /L %%i IN (1,1,!mariadb_net_versions_count!) DO (
+	SET installed=false
+	FOR /L %%j IN (1,1,!mariadb_local_versions_count!) DO (
+		IF "!mariadb_net_versions[%%i]!" == "!mariadb_local_versions[%%j]!" (
+			SET installed=true
+		)
+	)
+	SET ver=!mariadb_net_versions[%%i]!
+	IF "!installed!"=="false" (
+		IF "!PROCESSOR_ARCHITECTURE!" == "x86" ( :: Only print has x86
+			IF "!ver:~0,5!" LEQ "10.1." (
+				ECHO MariaDB-!ver!
+			)
+			IF "!ver:~0,5!" == "10.2." (
+				IF "!ver:~5,7!" LEQ "41" (
+					ECHO MariaDB-!ver!
+				)
+			)
+		) ELSE (
+			ECHO MariaDB-!ver!
+		)
+	)
+)
+FOR /L %%i IN (1,1,!mariadb_local_versions_count!) DO (
+	ECHO MariaDB-!mariadb_local_versions[%%i]! [INSTALLED]
+)
+EXIT /b
+
+:mysql_version
+CALL :print_mariadb_version
+PAUSE
+GOTO mysql_menu
+
 :exit
 exit /b 0
