@@ -198,7 +198,7 @@ IF %php_path% NEQ 0 (
 	FOR /F "delims=" %%a IN (.\\tmp\\temp.txt) DO (
 		POWERSHELL -Command "$matches=[regex]::matches('%%a', '^(.*)\.(exe|bat)'); $fname=$matches.Groups[1].Value; Write-Output \"@echo off`n!php_path!\%%a !%%*\" | Out-File -FilePath \".\php\bin\$fname.bat\" -Encoding ASCII"
 	)
-	CALL :apache_php_module
+	CALL :apache_set_php_module
 	ECHO %php_ver% set as default.
 ) ELSE (
 	POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-!php_local_versions[%php_local_versions_count%]!' | Set-Content .\\default.conf"
@@ -395,6 +395,43 @@ IF ERRORLEVEL 1 GOTO apache_install
 PAUSE
 GOTO main_menu
 
+:apache_set_php_module
+SET php_version=
+SET php_mod=
+IF "%php_version%" == "" (
+	POWERSHELL -Command ^
+		"$content=Get-Content -Path .\\default.conf | Out-String;" ^
+		"$matches=[regex]::matches($content, 'php=php-([0-9\.]+)');" ^
+		"if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"php-$ver\"}" ^
+		"else {Write-Output php-0.0.0}" > .\\tmp\\temp.txt
+	SET /p php_version=<.\\tmp\\temp.txt
+	POWERSHELL -Command ^
+		"$content=Get-Content -Path .\\default.conf | Out-String;" ^
+		"$matches=[regex]::matches($content, 'php=php-([0-9]+)');" ^
+		"if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Host \"$ver\"}" ^
+		"else { Write-Host '0'}" > .\\tmp\\temp.txt
+	SET /p phpmod=<.\\tmp\\temp.txt
+	IF !phpmod! GTR 7 (
+		SET phpmod=
+	)
+	DEL .\\tmp\\temp.txt
+)
+IF EXIST .\\apache\\conf\\httpd.conf (
+	IF "%php_version%" == "php-0.0.0" (
+		POWERSHELL -Command ^
+			"$content=(Get-Content .\\apache\\conf\\httpd.conf | Out-String);" ^
+			"$content=[regex]::Replace($content, \"#?LoadModule php\d?_module '.*'\", \"#LoadModule php_module ''\");" ^
+			"Write-Output $content | Set-Content .\\apache\\conf\\httpd.conf"
+	) ELSE (
+		POWERSHELL -Command ^
+			"$dll=(Get-ChildItem -Path .\\php\\%php_version% -Filter *apache*.dll | Select-Object -First 1).Name;" ^
+			"$content=(Get-Content .\\apache\\conf\\httpd.conf | Out-String);" ^
+			"$content=[regex]::Replace($content, \"#?LoadModule php\d?_module '.*'\", \"LoadModule php%phpmod%_module '%CD%\\php\\%php_version%\\$dll'\");" ^
+			"Write-Output $content | Set-Content .\\apache\\conf\\httpd.conf"
+	)
+)
+EXIT /b
+
 :apache_status
 POWERSHELL -Command "tasklist | findstr /i httpd | Select-Object -First 1" > .\\tmp\temp.txt
 SET count=0
@@ -459,7 +496,7 @@ IF EXIST .\\apache\\bin\\httpd.exe (
 		"$content=[regex]::Replace($content, 'DirectoryIndex index.html', 'DirectoryIndex index.php index.html index.htm');" ^
 		"$content=[regex]::Replace($content, \"^<IfModule mime_module^>\", \"^<IfModule mime_module^>`n    AddHandler application/x-httpd-php .php .phar\");" ^
 		"Write-Output $content | Set-Content -Path .\\apache\\conf\\httpd.conf"
-	CALL :apache_php_module
+	CALL :apache_set_php_module
 	ECHO Apache installed.
 ) ELSE (
 	ECHO Apache failed to install.
