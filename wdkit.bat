@@ -313,11 +313,18 @@ IF NOT EXIST .\\tmp\\php-!choosen_php_version!.zip (
 	)		
 	DEL .\\tmp\\temp.txt
 	
-	POWERSHELL -Command "$res=Invoke-WebRequest -Method HEAD -Uri 'https://windows.php.net!download_path!'; Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt"
+	POWERSHELL -Command ^
+		"try {" ^
+		"	$res=Invoke-WebRequest -Method HEAD -Uri 'https://windows.php.net!download_path!';" ^
+		"	Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt " ^
+		"} catch { " ^
+		"	Write-Output '?' | Set-Content .\\tmp\\temp.txt;" ^
+		"	Write-Host \"Can't get file size\";" ^
+		"}"
 	SET /p filesize=<.\\tmp\\temp.txt
 	DEL .\\tmp\\temp.txt
 	SET y=false
-	SET /p continue=You need download !filesize! MiB file. Continue? [Y/N] 
+	SET /p continue=You need download !filesize!MiB file. Continue? [Y/N] 
 	IF "!continue!" == "y" (
 		SET y=true
 	) ELSE IF "!continue!" == "Y" (
@@ -329,7 +336,7 @@ IF NOT EXIST .\\tmp\\php-!choosen_php_version!.zip (
 	) ELSE (
 		ECHO Cancelled.
 		PAUSE
-		GOTO apache_menu
+		GOTO php_menu
 	)
 )
 
@@ -532,10 +539,17 @@ IF NOT EXIST .\\tmp\\apache.zip (
 		SET /p download_path=<.\\tmp\temp.txt
 	)
 	DEL .\\tmp\\temp.txt
-	POWERSHELL -Command "$res=Invoke-WebRequest -Method HEAD -Uri 'https://www.apachelounge.com!download_path!'; Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt"
+	POWERSHELL -Command ^
+		"try {" ^
+		"	$res=Invoke-WebRequest -Method HEAD -Uri 'https://www.apachelounge.com!download_path!';" ^
+		"	Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt " ^
+		"} catch { " ^
+		"	Write-Output '?' | Set-Content .\\tmp\\temp.txt;" ^
+		"	Write-Host \"Can't get file size\";" ^
+		"}"
 	SET /p filesize=<.\\tmp\\temp.txt
 	SET y=false
-	SET /p continue=You need download !filesize! MiB file. Continue? [Y/N] 
+	SET /p continue=You need download !filesize!MiB file. Continue? [Y/N] 
 	IF "!continue!" == "y" (
 		SET y=true
 	) ELSE IF "!continue!" == "Y" (
@@ -910,11 +924,18 @@ DEL .\\tmp\\temp.txt
 DEL .\\tmp\\mirror.json
 
 IF NOT EXIST .\\tmp\\mariadb-!choosen_mariadb_version!.zip (
-	POWERSHELL -Command "$res=Invoke-WebRequest -Method HEAD -Uri '!mirror_url!!file_path!'; Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt"
+	POWERSHELL -Command ^
+		"try {" ^
+		"	$res=Invoke-WebRequest -Method HEAD -Uri '!mirror_url!!file_path!';" ^
+		"	Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt " ^
+		"} catch { " ^
+		"	Write-Output '?' | Set-Content .\\tmp\\temp.txt;" ^
+		"	Write-Host \"Can't get file size\";" ^
+		"}"
 	SET /p filesize=<.\\tmp\\temp.txt
 	DEL .\\tmp\\temp.txt
 	SET y=false
-	SET /p continue=You need download !filesize! MiB file. Continue? [Y/N] 
+	SET /p continue=You need download !filesize!MiB file. Continue? [Y/N] 
 	IF "!continue!" == "y" (
 		SET y=true
 	) ELSE IF "!continue!" == "Y" (
