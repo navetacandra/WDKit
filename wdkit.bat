@@ -694,6 +694,54 @@ FOR /L %%i IN (1,1,!mariadb_local_versions_count!) DO (
 )
 EXIT /b
 
+:mariadb_create_default_bin
+CALL :get_local_mariadb_versions
+POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'mariadb=mariadb-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"mariadb-$ver\"} else {Write-Output mariadb-0.0.0}" > .\\tmp\\temp.txt
+SET /p mariadb_ver=<.\\tmp\\temp.txt
+DEL .\\tmp\\temp.txt
+
+IF EXIST .\\mariadb\\bin (
+	RMDIR /S /Q .\\mariadb\\bin
+)
+MKDIR .\\mariadb\\bin
+
+IF "!mariadb_ver!"=="mariadb-0.0.0" (
+	IF !mariadb_local_versions_count! GTR 0 (
+		SET mariadb_ver=mariadb-!mariadb_local_versions[%mariadb_local_versions_count%]!
+		POWERSHELL -Command "FINDSTR /i 'mariadb=' default.conf" > .\\tmp\temp.txt
+		SET /p  mariadb_line_conf=<.\\tmp\temp.txt
+		IF "!php_line_conf!" == "" (
+			ECHO mariadb=mariadb-!php_local_versions[%mariadb_local_versions_count%]! >> default.conf
+		) ELSE (
+			POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'mariadb=(mariadb-([0-9.]*))?', 'mariadb=mariadb-!mariadb_local_versions[%mariadb_local_versions_count%]!' | Set-Content .\\default.conf"
+		)
+	) ELSE (
+		ECHO MariaDB not installed.
+		PAUSE
+		GOTO mysql_menu
+	)
+)
+
+SET mariadb_path=0
+FOR /L %%i IN (1,1,!mariadb_local_versions_count!) DO (
+	IF "mariadb-!mariadb_local_versions[%%i]!"=="!mariadb_ver!" (
+		IF EXIST .\\mariadb\\mariadb-!mariadb_local_versions[%%i]! (
+			SET mariadb_path=!CD!\\mariadb\\mariadb-!mariadb_local_versions[%%i]!
+		)
+	)
+)
+IF !mariadb_path! NEQ 0 (
+	POWERSHELL -Command "$content=Get-ChildItem -Path !mariadb_path!\\bin | Where-Object {$_.Name -match '^.+\.(exe|bat)$'}; $apps=@(); foreach($c in $content) {$apps+=$c.Name}; Write-Output $apps" > .\\tmp\\temp.txt
+	FOR /F "delims=" %%a IN (.\\tmp\\temp.txt) DO (
+		POWERSHELL -Command "$ampersand='&';$matches=[regex]::matches('%%a', '^(.*)\.(exe|bat)'); $fname=$matches.Groups[1].Value; Write-Output \"@echo off`n!mariadb_path!\\bin\\%%a !%%* $ampersand$ampersand exit\" | Out-File -FilePath \".\mariadb\bin\$fname.bat\" -Encoding ASCII"
+	)
+	ECHO !mariadb_ver! set as default.
+) ELSE (
+	POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'mariadb=(mariadb-([0-9.]*))?', 'mariadb=mariadb-!mariadb_local_versions[%mariadb_local_versions_count%]!' | Set-Content .\\default.conf"
+	GOTO mariadb_create_default_bin
+)
+EXIT /b
+
 :mysql_install
 CALL :print_mariadb_version
 SET /p choosen_mariadb_version=Download MariaDB Version: 
