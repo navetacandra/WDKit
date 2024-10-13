@@ -395,6 +395,20 @@ IF ERRORLEVEL 1 GOTO apache_install
 PAUSE
 GOTO main_menu
 
+:apache_status
+POWERSHELL -Command "tasklist | findstr /i httpd | Select-Object -First 1" > .\\tmp\temp.txt
+SET count=0
+FOR /f %%a IN (.\\tmp\\temp.txt) DO (
+	SET /a count+=1
+)
+DEL .\\tmp\temp.txt
+IF !count! GTR 0 (
+	ECHO Apache: Started
+) ELSE (
+	ECHO Apache: Stopped
+)
+EXIT /b
+
 :mysql_menu
 CLS
 ECHO ========================================================
