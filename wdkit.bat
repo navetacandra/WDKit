@@ -39,7 +39,7 @@ IF NOT EXIST ".\\php\\" (
 	MKDIR ".\\php\\"
 ) ELSE (
 	CALL :php_get_local_versions
-	IF %php_local_versions_count% GTR 0 AND NOT EXIST ".\\php\\bin" (
+	IF !php_local_versions_count! GTR 0 AND NOT EXIST ".\\php\\bin" (
 		MKDIR ".\\php\\bin"
 	)
 )
@@ -65,7 +65,7 @@ POWERSHELL -Command ^
 	"	} " ^
 	"} else {" ^
 	" Write-Host 'Error: Could not find zip file.'}"
-IF %ERRORLEVEL% NEQ 0 (
+IF !ERRORLEVEL! NEQ 0 (
 	RMDIR "%~f2"
 	ECHO Failed to unzip
 ) ELSE (
@@ -94,7 +94,7 @@ GOTO main_menu
 
 :php_get_net_versions
 IF NOT DEFINED php_net_versions[1] (
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://windows.php.net/downloads/releases/archives/ -OutFile .\\tmp\\php_archives_version.html"
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://windows.php.net/downloads/releases/archives/ -OutFile .\\tmp\\php_archives_version.html"
 	POWERSHELL -Command ^
 		"$content=Get-Content -Path .\\tmp\\php_archives_version.html | Out-String;" ^
 		"$matches=[regex]::matches($content, '/downloads/releases/archives/php-([0-9\.]+)-Win32-(vc|vs|VC|VS)\d+-x(86|64).zip');" ^
@@ -102,7 +102,7 @@ IF NOT DEFINED php_net_versions[1] (
 		"foreach($match in $matches) { $versions+=$match.Groups[1].Value };" ^
 		"$versions = $versions | Sort-Object -Unique; Write-Output $versions" > .\\tmp\temp.txt
 	DEL .\\tmp\\php_archives_version.html
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://windows.php.net/downloads/releases/ -OutFile .\\tmp\\php_releases_version.html"
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://windows.php.net/downloads/releases/ -OutFile .\\tmp\\php_releases_version.html"
 	FOR /f "delims=" %%a IN (.\\tmp\\temp.txt) DO (
 		SET /a php_net_archive_versions_count+=1
 		SET "php_net_archive_versions[!php_net_archive_versions_count!]=%%a"
@@ -144,9 +144,9 @@ EXIT /b
 ECHO Fetching PHP Versions...
 CALL :php_get_net_versions
 CALL :php_get_local_versions
-FOR /L %%i IN (1,1,%php_net_versions_count%) DO (
+FOR /L %%i IN (1,1,!php_net_versions_count!) DO (
 	SET installed=false
-	FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
+	FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
 		IF "!php_net_versions[%%i]!" == "!php_local_versions[%%j]!" (
 			SET installed=true
 		)
@@ -156,7 +156,7 @@ FOR /L %%i IN (1,1,%php_net_versions_count%) DO (
 		ECHO PHP version: !php_net_versions[%%i]!
 	)
 )
-FOR /L %%i IN (1,1,%php_local_versions_count%) DO (
+FOR /L %%i IN (1,1,!php_local_versions_count!) DO (
 	ECHO PHP version: !php_local_versions[%%i]! [INSTALLED]
 )
 EXIT /b
@@ -172,12 +172,12 @@ IF EXIST .\\php\\bin (
 )
 MKDIR .\\php\\bin
 
-IF "%php_ver%"=="php-0.0.0" (
-	IF %php_local_versions_count% GTR 0 (
+IF "!php_ver!"=="php-0.0.0" (
+	IF !php_local_versions_count! GTR 0 (
 		SET php_ver=php-!php_local_versions[%php_local_versions_count%]!
 		POWERSHELL -Command "FINDSTR /i 'php=' default.conf" > .\\tmp\temp.txt
 		SET /p  php_line_conf=<.\\tmp\temp.txt
-		IF "%php_line_conf%" == "" (
+		IF "!php_line_conf!" == "" (
 			ECHO php=php-!php_local_versions[%php_local_versions_count%]! >> default.conf
 		) ELSE (
 			POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-!php_local_versions[%php_local_versions_count%]!' | Set-Content .\\default.conf"
@@ -190,20 +190,20 @@ IF "%php_ver%"=="php-0.0.0" (
 )
 
 SET php_path=0
-FOR /L %%i IN (1,1,%php_local_versions_count%) DO (
-	IF "php-!php_local_versions[%%i]!"=="%php_ver%" (
+FOR /L %%i IN (1,1,!php_local_versions_count!) DO (
+	IF "php-!php_local_versions[%%i]!"=="!php_ver!" (
 		IF EXIST .\\php\\php-!php_local_versions[%%i]! (
 			SET php_path=%CD%\\php\\php-!php_local_versions[%%i]!
 		)
 	)
 )
-IF %php_path% NEQ 0 (
-	POWERSHELL -Command "$content=Get-ChildItem -Path %php_path% | Where-Object {$_.Name -match '^.+\.(exe|bat)$'}; $apps=@(); foreach($c in $content) {$apps+=$c.Name}; Write-Output $apps" > .\\tmp\\temp.txt
+IF !php_path! NEQ 0 (
+	POWERSHELL -Command "$content=Get-ChildItem -Path !php_path! | Where-Object {$_.Name -match '^.+\.(exe|bat)$'}; $apps=@(); foreach($c in $content) {$apps+=$c.Name}; Write-Output $apps" > .\\tmp\\temp.txt
 	FOR /F "delims=" %%a IN (.\\tmp\\temp.txt) DO (
 		POWERSHELL -Command "$matches=[regex]::matches('%%a', '^(.*)\.(exe|bat)'); $fname=$matches.Groups[1].Value; Write-Output \"@echo off`n!php_path!\%%a !%%*\" | Out-File -FilePath \".\php\bin\$fname.bat\" -Encoding ASCII"
 	)
 	CALL :apache_set_php_module
-	ECHO %php_ver% set as default.
+	ECHO !php_ver! set as default.
 ) ELSE (
 	POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-!php_local_versions[%php_local_versions_count%]!' | Set-Content .\\default.conf"
 	GOTO php_create_default_bin
@@ -218,15 +218,15 @@ SET archived=true
 ECHO Validating version..
 
 SET valid_version=false
-FOR /L %%i IN (1,1,%php_net_versions_count%) DO (
-	IF "!php_net_versions[%%i]!" == "%choosen_php_version%" (
+FOR /L %%i IN (1,1,!php_net_versions_count!) DO (
+	IF "!php_net_versions[%%i]!" == "!choosen_php_version!" (
 		SET installed=
-		FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
+		FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
 			IF "!php_net_versions[%%i]!" == "!php_local_versions[%%j]!" (SET installed=true)
 		)
 
 		IF "!installed!"=="true" (
-			ECHO PHP-%choosen_php_version% already installed.
+			ECHO PHP-!choosen_php_version! already installed.
 			PAUSE
 			GOTO :php_menu
 		) ELSE (
@@ -235,23 +235,23 @@ FOR /L %%i IN (1,1,%php_net_versions_count%) DO (
 	)
 )
 
-IF NOT "%valid_version%" == "true" (
+IF NOT "!valid_version!" == "true" (
 	ECHO PHP version is invalid or not found at repository.
 	PAUSE
 	GOTO php_menu
 )
 
-FOR /L %%i IN (1,1,%php_net_release_versions_count%) DO (
-	IF "!php_net_release_versions[%%i]!" == "%choosen_php_version%" (
+FOR /L %%i IN (1,1,!php_net_release_versions_count!) DO (
+	IF "!php_net_release_versions[%%i]!" == "!choosen_php_version!" (
 		SET archived=false
 	)
 )
 
-IF "%archived%" == "true" (
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://windows.php.net/downloads/releases/archives/ -OutFile .\\tmp\\php_repos.html"
+IF "!archived!" == "true" (
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://windows.php.net/downloads/releases/archives/ -OutFile .\\tmp\\php_repos.html"
 	POWERSHELL -Command "$content=Get-Content -Path .\\tmp\\php_repos.html | Out-String; $matches=[regex]::matches($content, '/downloads/releases/archives/php-!choosen_php_version!-Win32-(vc|vs|VC|VS)\d+-x(86|64).zip'); $versions=@(); foreach($match in $matches) { $versions+=$match.Value }; Write-Output $versions" > .\\tmp\temp.txt
 ) ELSE (
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://windows.php.net/downloads/releases/ -OutFile .\\tmp\\php_repos.html"
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://windows.php.net/downloads/releases/ -OutFile .\\tmp\\php_repos.html"
 	POWERSHELL -Command "$content=Get-Content -Path .\\tmp\\php_repos.html | Out-String; $matches=[regex]::matches($content, '/downloads/releases/php-!choosen_php_version!-Win32-(vc|vs|VC|VS)\d+-x(86|64).zip'); $versions=@(); foreach($match in $matches) { $versions+=$match.Value }; Write-Output $versions" > .\\tmp\temp.txt
 )
 IF EXIST .\\tmp\\php_repos.html (
@@ -273,7 +273,7 @@ IF !count! LSS 1 (
 
 IF NOT EXIST .\\tmp\\php-!choosen_php_version!.zip (
 	SET arch=x64
-	ECHO Downloading PHP-%choosen_php_version%...
+	ECHO Downloading PHP-!choosen_php_version!...
 	IF "%PROCESSOR_ARCHITECTURE%"=="x86" (
 		SET arch=x86
 	)
@@ -285,7 +285,7 @@ IF NOT EXIST .\\tmp\\php-!choosen_php_version!.zip (
 	)
 			
 	DEL .\\tmp\\temp.txt
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://windows.php.net%download_path% -OutFile .\\tmp\\php-!choosen_php_version!.zip"
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://windows.php.net!download_path! -OutFile .\\tmp\\php-!choosen_php_version!.zip"
 )
 
 ECHO Unzipping...
@@ -317,60 +317,60 @@ GOTO php_menu
 :php_set_default_version
 ECHO Getting installed PHP versions...
 CALL :php_get_local_versions
-FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
+FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
 	ECHO PHP-!php_local_versions[%%j]!
 )
 SET /p choosen_php_version=Set PHP Version as default: 
 SET installed=false
-FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
-	IF !php_local_versions[%%j]! == %choosen_php_version% (
+FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
+	IF !php_local_versions[%%j]! == !choosen_php_version! (
 		SET installed=true
 	)
 )
 
-IF "%installed%" == "true" (
+IF "!installed!" == "true" (
 	ECHO Update default php version...
-	POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-%choosen_php_version%' | Set-Content .\\default.conf"
+	POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-!choosen_php_version!' | Set-Content .\\default.conf"
 	CALL :php_create_default_bin
 ) ELSE (
-	ECHO PHP-%choosen_php_version% is not installed.
+	ECHO PHP-!choosen_php_version! is not installed.
 )
 PAUSE
 GOTO :php_menu
 
 :php_uninstall
 CALL :php_get_local_versions
-FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
+FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
 	ECHO PHP-!php_local_versions[%%j]!
 )
 
 SET /p choosen_php_version=Uninstall PHP Version: 
 SET installed=false
-FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
-	IF !php_local_versions[%%j]! == %choosen_php_version% (
+FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
+	IF !php_local_versions[%%j]! == !choosen_php_version! (
 		SET installed=true
 	)
 )
 
-IF "%installed%" == "true" (
+IF "!installed!" == "true" (
 	SET y=false
-	SET /p continue=Do you want continue uninstall PHP-%choosen_php_version% [Y/N]?
-	IF "%continue%" == "y" (
+	SET /p continue=Do you want continue uninstall PHP-!choosen_php_version! [Y/N]?
+	IF "!continue!" == "y" (
 		SET y=true
-	) ELSE IF "%continue%" == "Y" (
+	) ELSE IF "!continue!" == "Y" (
 		SET y=true
 	)
 	
-	IF "%y%" == "true" (
-		RMDIR /S /Q .\\php\\php-%choosen_php_version%\\
-		ECHO Uninstall PHP-%choosen_php_version% successful.
+	IF "!y!" == "true" (
+		RMDIR /S /Q .\\php\\php-!choosen_php_version!\\
+		ECHO Uninstall PHP-!choosen_php_version! successful.
 		ECHO Update default php version...
 		CALL :php_create_default_bin
 	) ELSE (
 		ECHO Uninstallation cancelled.
 	)
 ) ELSE (
-	ECHO PHP-%choosen_php_version% is not installed.
+	ECHO PHP-!choosen_php_version! is not installed.
 )
 
 PAUSE
@@ -401,7 +401,7 @@ GOTO main_menu
 :apache_set_php_module
 SET php_version=
 SET php_mod=
-IF "%php_version%" == "" (
+IF "!php_version!" == "" (
 	POWERSHELL -Command ^
 		"$content=Get-Content -Path .\\default.conf | Out-String;" ^
 		"$matches=[regex]::matches($content, 'php=php-([0-9\.]+)');" ^
@@ -420,16 +420,16 @@ IF "%php_version%" == "" (
 	DEL .\\tmp\\temp.txt
 )
 IF EXIST .\\apache\\conf\\httpd.conf (
-	IF "%php_version%" == "php-0.0.0" (
+	IF "!php_version!" == "php-0.0.0" (
 		POWERSHELL -Command ^
 			"$content=(Get-Content .\\apache\\conf\\httpd.conf | Out-String);" ^
 			"$content=[regex]::Replace($content, \"#?LoadModule php\d?_module '.*'\", \"#LoadModule php_module ''\");" ^
 			"Write-Output $content | Set-Content .\\apache\\conf\\httpd.conf"
 	) ELSE (
 		POWERSHELL -Command ^
-			"$dll=(Get-ChildItem -Path .\\php\\%php_version% -Filter *apache*.dll | Select-Object -First 1).Name;" ^
+			"$dll=(Get-ChildItem -Path .\\php\\!php_version! -Filter *apache*.dll | Select-Object -First 1).Name;" ^
 			"$content=(Get-Content .\\apache\\conf\\httpd.conf | Out-String);" ^
-			"$content=[regex]::Replace($content, \"#?LoadModule php\d?_module '.*'\", \"LoadModule php%phpmod%_module '%CD%\\php\\%php_version%\\$dll'\");" ^
+			"$content=[regex]::Replace($content, \"#?LoadModule php\d?_module '.*'\", \"LoadModule php!phpmod!_module '%CD%\\php\\!php_version!\\$dll'\");" ^
 			"Write-Output $content | Set-Content .\\apache\\conf\\httpd.conf"
 	)
 )
@@ -450,7 +450,7 @@ IF !count! GTR 0 (
 EXIT /b
 
 :apache_install
-POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://www.apachelounge.com/download/ -OutFile .\\tmp\\apachelounge.html"
+POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://www.apachelounge.com/download/ -OutFile .\\tmp\\apachelounge.html"
 POWERSHELL -Command " $content=Get-Content -Path .\\tmp\\apachelounge.html | Out-String; $matches=[regex]::matches($content, 'Apache ([0-9\.]+) .+ Windows Binaries and Modules'); $ver=$matches.Groups[1].Value -replace '\.', ''; Write-Output \"Apache$ver\"" > .\\tmp\\temp.txt
 SET /p apache_version=<.\\tmp\\temp.txt
 DEL .\\tmp\\temp.txt
@@ -484,11 +484,11 @@ IF NOT EXIST .\\tmp\\apache.zip (
 	DEL .\\tmp\\temp.txt
 
 	ECHO Downloading apache...
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://www.apachelounge.com%download_path% -OutFile .\\tmp\\apache.zip"
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://www.apachelounge.com%download_path% -OutFile .\\tmp\\apache.zip"
 )
 
 ECHO Unzipping...
-CALL :unzipper ".\\tmp\\apache.zip\\%apache_version%" ".\\apache"
+CALL :unzipper ".\\tmp\\apache.zip\\!apache_version!" ".\\apache"
 IF EXIST .\\apache\\bin\\httpd.exe (
 	POWERSHELL -Command ^
 		"$content=Get-Content .\\apache\\conf\\httpd.conf | Out-String;" ^
@@ -577,13 +577,13 @@ GOTO apache_menu
 :apache_uninstall
 SET y=false
 SET /p continue=Do you want continue uninstall Apache [Y/N]?
-IF "%continue%" == "y" (
+IF "!continue!" == "y" (
 	SET y=true
-) ELSE IF "%continue%" == "Y" (
+) ELSE IF "!continue!" == "Y" (
 	SET y=true
 )
 	
-IF "%y%" == "true" (
+IF "!y!" == "true" (
 	POWERSHELL -Command "tasklist | findstr /i httpd | Select-Object -First 1" > .\\tmp\temp.txt
 	SET count=0
 	FOR /f %%a IN (.\\tmp\temp.txt) DO (
@@ -674,7 +674,7 @@ FOR /L %%i IN (1,1,!mariadb_net_versions_count!) DO (
 	)
 	SET ver=!mariadb_net_versions[%%i]!
 	IF "!installed!"=="false" (
-		IF "!PROCESSOR_ARCHITECTURE!" == "x86" ( :: Only print has x86
+		IF "%PROCESSOR_ARCHITECTURE%" == "x86" ( :: Only print has x86
 			IF "!ver:~0,5!" LEQ "10.1." (
 				ECHO MariaDB-!ver!
 			)
@@ -725,7 +725,7 @@ SET mariadb_path=0
 FOR /L %%i IN (1,1,!mariadb_local_versions_count!) DO (
 	IF "mariadb-!mariadb_local_versions[%%i]!"=="!mariadb_ver!" (
 		IF EXIST .\\mariadb\\mariadb-!mariadb_local_versions[%%i]! (
-			SET mariadb_path=!CD!\\mariadb\\mariadb-!mariadb_local_versions[%%i]!
+			SET mariadb_path=%CD%\\mariadb\\mariadb-!mariadb_local_versions[%%i]!
 		)
 	)
 )
@@ -811,7 +811,7 @@ POWERSHELL -Command ^
 SET /p mirror_url=<.\\tmp\\temp.txt
 POWERSHELL -Command ^
 	"$arch_code='x86';" ^
-	"$arch='!PROCESSOR_ARCHITECTURE!';" ^
+	"$arch='%PROCESSOR_ARCHITECTURE%';" ^
 	"if($arch -eq 'AMD64') {$arch_code='x86_64'}" ^
 	"$content=Get-Content -Path .\\tmp\\mirror.json -Raw;" ^
 	"$data=ConvertFrom-Json -InputObject $content;" ^
@@ -829,10 +829,10 @@ POWERSHELL -Command ^
 	"Write-Output $file_path | Set-Content .\\tmp\\temp.txt;"
 SET /p file_path=<.\\tmp\\temp.txt
 IF "!file_path!" == "" (
-	SET arch=!PROCESSOR_ARCHITECTURE!
-	IF "!PROCESSOR_ARCHITECTURE!" == "AMD64" (
+	SET arch=%PROCESSOR_ARCHITECTURE%
+	IF "%PROCESSOR_ARCHITECTURE%" == "AMD64" (
 		SET arch=x86_64
-	) ELSE IF "!PROCESSOR_ARCHITECTURE!" == "x86" (
+	) ELSE IF "%PROCESSOR_ARCHITECTURE%" == "x86" (
 		SET arch=x86
 	)
 	ECHO Cannot get file for Windows-!arch!
