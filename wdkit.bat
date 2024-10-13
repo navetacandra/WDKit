@@ -509,6 +509,12 @@ PAUSE
 GOTO apache_menu
 
 :apache_start
+IF NOT EXIST .\\apache\\bin\\httpd.exe (
+	ECHO Apache is not installed
+	PAUSE
+	GOTO apache_menu
+)
+
 POWERSHELL -Command "tasklist | findstr /i httpd | Select-Object -First 1" > .\\tmp\temp.txt
 SET count=0
 FOR /f %%a IN (.\\tmp\temp.txt) DO (
@@ -516,7 +522,7 @@ FOR /f %%a IN (.\\tmp\temp.txt) DO (
 )
 DEL .\\tmp\temp.txt
 IF !count!==0 (
-	IF EXIST .\\apache\\bin\\httpd.exe (START /min /b .\\apache\\bin\\httpd.exe)
+	START /min /b .\\apache\\bin\\httpd.exe
 ) ELSE (
 	ECHO Apache already started
 )
@@ -525,6 +531,12 @@ PAUSE
 GOTO apache_menu
 
 :apache_stop
+IF NOT EXIST .\\apache\\bin\\httpd.exe (
+	ECHO Apache is not installed
+	PAUSE
+	GOTO apache_menu
+)
+
 POWERSHELL -Command "tasklist | findstr /i httpd | Select-Object -First 1" > .\\tmp\temp.txt
 SET count=0
 FOR /f %%a IN (.\\tmp\temp.txt) DO (
@@ -539,6 +551,12 @@ PAUSE
 GOTO apache_menu
 
 :apache_restart
+IF NOT EXIST .\\apache\\bin\\httpd.exe (
+	ECHO Apache is not installed
+	PAUSE
+	GOTO apache_menu
+)
+
 POWERSHELL -Command "tasklist | findstr /i httpd | Select-Object -First 1" > .\\tmp\temp.txt
 SET count=0
 FOR /f %%a IN (.\\tmp\temp.txt) DO (
