@@ -553,6 +553,36 @@ CALL :apache_status
 PAUSE
 GOTO apache_menu
 
+:apache_uninstall
+SET y=false
+SET /p continue=Do you want continue uninstall Apache [Y/N]?
+IF "%continue%" == "y" (
+	SET y=true
+) ELSE IF "%continue%" == "Y" (
+	SET y=true
+)
+	
+IF "%y%" == "true" (
+	POWERSHELL -Command "tasklist | findstr /i httpd | Select-Object -First 1" > .\\tmp\temp.txt
+	SET count=0
+	FOR /f %%a IN (.\\tmp\temp.txt) DO (
+		SET /a count+=1
+	)
+	DEL .\\tmp\temp.txt
+	IF !count! GTR 0 (
+		POWERSHELL -Command "Stop-Process -Id (Get-Process -Name httpd).Id -Force"
+	)
+	IF EXIST .\\apache (
+		RMDIR /S /Q .\\apache
+		MKDIR .\\apache
+	)
+	ECHO Apache uninstalled.
+) ELSE (
+	ECHO Uninstallation cancelled.
+)
+PAUSE
+GOTO apache_menu
+
 :mysql_menu
 CLS
 ECHO ========================================================
