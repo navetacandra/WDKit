@@ -742,6 +742,20 @@ IF !mariadb_path! NEQ 0 (
 )
 EXIT /b
 
+:mariadb_status
+POWERSHELL -Command "tasklist | findstr /i mysqld | Select-Object -First 1" > .\\tmp\temp.txt
+SET count=0
+FOR /f %%a IN (.\\tmp\\temp.txt) DO (
+	SET /a count+=1
+)
+DEL .\\tmp\temp.txt
+IF !count! GTR 0 (
+	ECHO MariaDB: Started
+) ELSE (
+	ECHO MariaDB: Stopped
+)
+EXIT /b
+
 :mysql_install
 CALL :print_mariadb_version
 SET /p choosen_mariadb_version=Download MariaDB Version: 
