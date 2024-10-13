@@ -856,5 +856,76 @@ CALL :mariadb_create_default_bin
 PAUSE
 GOTO mysql_menu
 
+:mariadb_start
+IF NOT EXIST .\\mariadb\\bin\\mysqld.bat (
+	ECHO MariaDB is not installed
+	PAUSE
+	GOTO mysql_menu
+)
+
+POWERSHELL -Command "tasklist | findstr /i mysqld | Select-Object -First 1" > .\\tmp\temp.txt
+SET count=0
+FOR /f %%a IN (.\\tmp\temp.txt) DO (
+	SET /a count+=1
+)
+DEL .\\tmp\temp.txt
+IF !count!==0 (
+	POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'mariadb=mariadb-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"mariadb-$ver\"} else {Write-Output mariadb-0.0.0}" > .\\tmp\\temp.txt
+	SET /p mariadb_ver=<.\\tmp\\temp.txt
+	DEL .\\tmp\\temp.txt
+	START /min /b .\\mariadb\\!mariadb_ver!\\bin\\mysqld.exe
+) ELSE (
+	ECHO MariaDB already started
+)
+CALL :mariadb_status
+PAUSE
+GOTO mysql_menu
+
+:mariadb_stop
+IF NOT EXIST .\\mariadb\\bin\\mysqld.bat (
+	ECHO MariaDB is not installed
+	PAUSE
+	GOTO mysql_menu
+)
+
+POWERSHELL -Command "tasklist | findstr /i mysqld | Select-Object -First 1" > .\\tmp\temp.txt
+SET count=0
+FOR /f %%a IN (.\\tmp\temp.txt) DO (
+	SET /a count+=1
+)
+DEL .\\tmp\temp.txt
+IF !count! GTR 0 (
+	POWERSHELL -Command "Stop-Process -Id (Get-Process -Name mysqld).Id -Force"
+)
+CALL :mariadb_status
+PAUSE
+GOTO mysql_menu
+
+:mariadb_restart
+IF NOT EXIST .\\mariadb\\bin\\mysqld.bat (
+	ECHO MariaDB is not installed
+	PAUSE
+	GOTO mysql_menu
+)
+
+POWERSHELL -Command "tasklist | findstr /i mysqld | Select-Object -First 1" > .\\tmp\temp.txt
+SET count=0
+FOR /f %%a IN (.\\tmp\temp.txt) DO (
+	SET /a count+=1
+)
+DEL .\\tmp\temp.txt
+IF !count! GTR 0 (
+	POWERSHELL -Command "Stop-Process -Id (Get-Process -Name mysqld).Id -Force"
+)
+IF EXIST .\\mariadb\\bin\\mysqld.bat (
+	POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'mariadb=mariadb-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"mariadb-$ver\"} else {Write-Output mariadb-0.0.0}" > .\\tmp\\temp.txt
+	SET /p mariadb_ver=<.\\tmp\\temp.txt
+	DEL .\\tmp\\temp.txt
+	START /min /b .\\mariadb\\!mariadb_ver!\\bin\\mysqld.exe
+)
+CALL :mariadb_status
+PAUSE
+GOTO mysql_menu
+
 :exit
 exit /b 0
