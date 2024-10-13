@@ -335,6 +335,44 @@ IF "%installed%" == "true" (
 PAUSE
 GOTO :php_menu
 
+:uninstall_php
+CALL :get_local_php_versions
+FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
+	ECHO PHP-!php_local_versions[%%j]!
+)
+
+SET /p choosen_php_version=Uninstall PHP Version: 
+SET installed=false
+FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
+	IF !php_local_versions[%%j]! == %choosen_php_version% (
+		SET installed=true
+	)
+)
+
+IF "%installed%" == "true" (
+	SET y=false
+	SET /p continue=Do you want continue uninstall PHP-%choosen_php_version% [Y/N]?
+	IF "%continue%" == "y" (
+		SET y=true
+	) ELSE IF "%continue%" == "Y" (
+		SET y=true
+	)
+	
+	IF "%y%" == "true" (
+		RMDIR /S /Q .\\php\\php-%choosen_php_version%\\
+		ECHO Uninstall PHP-%choosen_php_version% successful.
+		ECHO Update default php version...
+		CALL :create_default_php_bin
+	) ELSE (
+		ECHO Uninstallation cancelled.
+	)
+) ELSE (
+	ECHO PHP-%choosen_php_version% is not installed.
+)
+
+PAUSE
+GOTO :php_menu
+
 :apache_menu
 CLS
 ECHO ========================================================
