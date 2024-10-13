@@ -409,6 +409,68 @@ IF !count! GTR 0 (
 )
 EXIT /b
 
+:apache_install
+POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://www.apachelounge.com/download/ -OutFile .\\tmp\\apachelounge.html"
+POWERSHELL -Command " $content=Get-Content -Path .\\tmp\\apachelounge.html | Out-String; $matches=[regex]::matches($content, 'Apache ([0-9\.]+) .+ Windows Binaries and Modules'); $ver=$matches.Groups[1].Value -replace '\.', ''; Write-Output \"Apache$ver\"" > .\\tmp\\temp.txt
+SET /p apache_version=<.\\tmp\\temp.txt
+DEL .\\tmp\\temp.txt
+
+IF NOT EXIST .\\tmp\\apache.zip (
+	SET download_regex="(/download/.+/binaries/httpd-.+-win(32|64)-.+\.zip)"
+	POWERSHELL -Command "$content=Get-Content -Path .\\tmp\\apachelounge.html | Out-String; $matches=[regex]::matches($content, $Env:download_regex); foreach($match in $matches) {Write-Output $match.Groups[1].Value}" > .\\tmp\\temp.txt
+	DEL .\\tmp\\apachelounge.html
+	SET arch=32
+	IF "%PROCESSOR_ARCHITECTURE%" == "AMD64" (
+		SET arch=64
+	)
+	SET count=0
+	FOR /f "delims=" %%a IN (.\\tmp\\temp.txt) DO (
+		IF NOT "%%a" == "" (
+			SET /a count+=1
+		)
+	)
+
+	IF !count! == 0 (
+		ECHO Failed get download URL.
+		PAUSE
+		GOTO apache_menu
+	)
+
+	SET /p download_path=<.\\tmp\\temp.txt
+	IF !count! GTR 1 (
+		POWERSHELL -Command "$content=Get-Content -Path .\\tmp\\temp.txt | Out-String; $matches=[regex]::matches($content, '.+-win!arch!-.+.zip'); Write-Output $matches[0].Value" > .\\tmp\\temp.txt
+		SET /p download_path=<.\\tmp\temp.txt
+	)
+	DEL .\\tmp\\temp.txt
+
+	ECHO Downloading apache...
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://www.apachelounge.com%download_path% -OutFile .\\tmp\\apache.zip"
+)
+
+ECHO Unzipping...
+CALL :unzipper ".\\tmp\\apache.zip\\%apache_version%" ".\\apache"
+IF EXIST .\\apache\\bin\\httpd.exe (
+	POWERSHELL -Command ^
+		"$content=Get-Content .\\apache\\conf\\httpd.conf | Out-String;" ^
+		"$content=[regex]::Replace($content, 'Define SRVROOT \".+\"', 'Define SRVROOT \"%CD%\\apache\"');" ^
+		"$content=$content -replace \"LoadModule actions_module modules/mod_actions.so\", \"LoadModule php_module ''`nLoadModule actions_module modules/mod_actions.so\";" ^
+		"$content=[regex]::Replace($content, '#ServerName www.example.com:80', 'ServerName localhost:80');" ^
+		"$content=[regex]::Replace($content, '\${SRVROOT}/htdocs', '%CD%\\htdocs');" ^
+		"$content=[regex]::Replace($content, 'DirectoryIndex index.html', 'DirectoryIndex index.php index.html index.htm');" ^
+		"$content=[regex]::Replace($content, \"^<IfModule mime_module^>\", \"^<IfModule mime_module^>`n    AddHandler application/x-httpd-php .php .phar\");" ^
+		"Write-Output $content | Set-Content -Path .\\apache\\conf\\httpd.conf"
+	CALL :apache_php_module
+	ECHO Apache installed.
+) ELSE (
+	ECHO Apache failed to install.
+)
+
+IF EXIST .\\tmp\\apache.zip (
+	DEL .\\tmp\\apache.zip
+)
+PAUSE
+GOTO apache_menu
+
 :mysql_menu
 CLS
 ECHO ========================================================
