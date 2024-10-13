@@ -54,6 +54,12 @@ IF NOT EXIST ".\\mariadb\\" (MKDIR ".\\mariadb\\")
 IF NOT EXIST ".\\postgres\\" (MKDIR ".\\postgres\\")
 GOTO main_menu
 
+:download_file
+SET url=%1
+SET filepath=%~f2
+POWERSHELL -File ".\\downloader.ps1" -ArgumentList -url "!url!" -filepath "!filepath!"
+EXIT /b
+
 :unzipper
 IF NOT EXIST "%~f2" (MKDIR "%~f2")
 POWERSHELL -Command ^
@@ -94,7 +100,7 @@ GOTO main_menu
 
 :php_get_net_versions
 IF NOT DEFINED php_net_versions[1] (
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://windows.php.net/downloads/releases/archives/ -OutFile .\\tmp\\php_archives_version.html"
+	CALL :download_file "https://windows.php.net/downloads/releases/archives/" ".\\tmp\\php_archives_version.html"
 	POWERSHELL -Command ^
 		"$content=Get-Content -Path .\\tmp\\php_archives_version.html | Out-String;" ^
 		"$matches=[regex]::matches($content, '/downloads/releases/archives/php-([0-9\.]+)-Win32-(vc|vs|VC|VS)\d+-x(86|64).zip');" ^
@@ -102,7 +108,6 @@ IF NOT DEFINED php_net_versions[1] (
 		"foreach($match in $matches) { $versions+=$match.Groups[1].Value };" ^
 		"$versions = $versions | Sort-Object -Unique; Write-Output $versions" > .\\tmp\temp.txt
 	DEL .\\tmp\\php_archives_version.html
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://windows.php.net/downloads/releases/ -OutFile .\\tmp\\php_releases_version.html"
 	FOR /f "delims=" %%a IN (.\\tmp\\temp.txt) DO (
 		SET /a php_net_archive_versions_count+=1
 		SET "php_net_archive_versions[!php_net_archive_versions_count!]=%%a"
@@ -111,6 +116,7 @@ IF NOT DEFINED php_net_versions[1] (
 	)
 	DEL .\\tmp\\temp.txt
 	
+	CALL :download_file "https://windows.php.net/downloads/releases/" ".\\tmp\\php_releases_version.html"
 	POWERSHELL -Command ^
 		"$content=Get-Content -Path .\\tmp\\php_releases_version.html | Out-String;" ^
 		"$matches=[regex]::matches($content, '/downloads/releases/php-([0-9\.]+)-Win32-(vc|vs|VC|VS)\d+-x(86|64).zip');" ^
@@ -153,11 +159,11 @@ FOR /L %%i IN (1,1,!php_net_versions_count!) DO (
 	)
 
 	IF "!installed!"=="false" (
-		ECHO PHP version: !php_net_versions[%%i]!
+		ECHO PHP-!php_net_versions[%%i]!
 	)
 )
 FOR /L %%i IN (1,1,!php_local_versions_count!) DO (
-	ECHO PHP version: !php_local_versions[%%i]! [INSTALLED]
+	ECHO PHP-!php_local_versions[%%i]! [INSTALLED]
 )
 EXIT /b
 
@@ -248,10 +254,10 @@ FOR /L %%i IN (1,1,!php_net_release_versions_count!) DO (
 )
 
 IF "!archived!" == "true" (
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://windows.php.net/downloads/releases/archives/ -OutFile .\\tmp\\php_repos.html"
+	CALL :download_file "https://windows.php.net/downloads/releases/archives/" ".\\tmp\\php_repos.html"
 	POWERSHELL -Command "$content=Get-Content -Path .\\tmp\\php_repos.html | Out-String; $matches=[regex]::matches($content, '/downloads/releases/archives/php-!choosen_php_version!-Win32-(vc|vs|VC|VS)\d+-x(86|64).zip'); $versions=@(); foreach($match in $matches) { $versions+=$match.Value }; Write-Output $versions" > .\\tmp\temp.txt
 ) ELSE (
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://windows.php.net/downloads/releases/ -OutFile .\\tmp\\php_repos.html"
+	CALL :download_file "https://windows.php.net/downloads/releases/" ".\\tmp\\php_repos.html"
 	POWERSHELL -Command "$content=Get-Content -Path .\\tmp\\php_repos.html | Out-String; $matches=[regex]::matches($content, '/downloads/releases/php-!choosen_php_version!-Win32-(vc|vs|VC|VS)\d+-x(86|64).zip'); $versions=@(); foreach($match in $matches) { $versions+=$match.Value }; Write-Output $versions" > .\\tmp\temp.txt
 )
 IF EXIST .\\tmp\\php_repos.html (
@@ -282,10 +288,27 @@ IF NOT EXIST .\\tmp\\php-!choosen_php_version!.zip (
 	IF !count! GTR 1 (
 		POWERSHELL -Command "$content=Get-Content -Path .\\tmp\\temp.txt | Out-String; $matches=[regex]::matches($content, '.+-!arch!.zip'); Write-Output $matches[0].Value" > .\\tmp\\temp.txt
 		SET /p download_path=<.\\tmp\temp.txt
-	)
-			
+	)		
 	DEL .\\tmp\\temp.txt
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://windows.php.net!download_path! -OutFile .\\tmp\\php-!choosen_php_version!.zip"
+	
+	POWERSHELL -Command "$res=Invoke-WebRequest -Method HEAD -Uri 'https://windows.php.net!download_path!'; Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt"
+	SET /p filesize=<.\\tmp\\temp.txt
+	DEL .\\tmp\\temp.txt
+	SET y=false
+	SET /p continue=You need download !filesize! MiB file. Continue? [Y/N] 
+	IF "!continue!" == "y" (
+		SET y=true
+	) ELSE IF "!continue!" == "Y" (
+		SET y=true
+	)
+
+	IF "!y!" == "true" (
+		CALL :download_file "https://windows.php.net!download_path!" ".\\tmp\\php-!choosen_php_version!.zip"
+	) ELSE (
+		ECHO Cancelled.
+		PAUSE
+		GOTO apache_menu
+	)
 )
 
 ECHO Unzipping...
@@ -317,8 +340,15 @@ GOTO php_menu
 :php_set_default_version
 ECHO Getting installed PHP versions...
 CALL :php_get_local_versions
+POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'php=php-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"php-$ver\"} else {Write-Output php-0.0.0}" > .\\tmp\\temp.txt
+SET /p php_ver=<.\\tmp\\temp.txt
+DEL .\\tmp\\temp.txt
 FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
-	ECHO PHP-!php_local_versions[%%j]!
+	IF "php-!php_local_versions[%%j]!" == "!php_ver!" (
+		ECHO PHP-!php_local_versions[%%j]! [DEFAULT]
+	) ELSE (
+		ECHO PHP-!php_local_versions[%%j]!
+	)
 )
 SET /p choosen_php_version=Set PHP Version as default: 
 SET installed=false
@@ -450,7 +480,7 @@ IF !count! GTR 0 (
 EXIT /b
 
 :apache_install
-POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://www.apachelounge.com/download/ -OutFile .\\tmp\\apachelounge.html"
+CALL :download_file "https://www.apachelounge.com/download/" ".\\tmp\\apachelounge.html"
 POWERSHELL -Command " $content=Get-Content -Path .\\tmp\\apachelounge.html | Out-String; $matches=[regex]::matches($content, 'Apache ([0-9\.]+) .+ Windows Binaries and Modules'); $ver=$matches.Groups[1].Value -replace '\.', ''; Write-Output \"Apache$ver\"" > .\\tmp\\temp.txt
 SET /p apache_version=<.\\tmp\\temp.txt
 DEL .\\tmp\\temp.txt
@@ -482,9 +512,26 @@ IF NOT EXIST .\\tmp\\apache.zip (
 		SET /p download_path=<.\\tmp\temp.txt
 	)
 	DEL .\\tmp\\temp.txt
+	
+	POWERSHELL -Command "$res=Invoke-WebRequest -Method HEAD -Uri 'https://www.apachelounge.com!download_path!'; Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt"
+	SET /p filesize=<.\\tmp\\temp.txt
+	DEL .\\tmp\\temp.txt
+	SET y=false
+	SET /p continue=You need download !filesize! MiB file. Continue? [Y/N] 
+	IF "!continue!" == "y" (
+		SET y=true
+	) ELSE IF "!continue!" == "Y" (
+		SET y=true
+	)
 
-	ECHO Downloading apache...
-	POWERSHELL -Command "Invoke-WebRequest -UserAgent $Env:userAgent -Uri https://www.apachelounge.com%download_path% -OutFile .\\tmp\\apache.zip"
+	IF "!y!" == "true" (
+		ECHO Downloading apache...
+		CALL :download_file "https://www.apachelounge.com%download_path%" ".\\tmp\\apache.zip"
+	) ELSE (
+		ECHO Cancelled.
+		PAUSE
+		GOTO apache_menu
+	)
 )
 
 ECHO Unzipping...
@@ -644,7 +691,7 @@ EXIT /b
 :mariadb_get_net_versions
 IF NOT !mariadb_net_versions_count! GTR 0 (
 	SET release_number_regex="release_number": "([0-9\.]+)"
-	POWERSHELL -Command "Invoke-WebRequest -Uri 'https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=true' -MaximumRedirection 5 -OutFile.\\tmp\\mariadb-ver.json"
+	CALL :download_file "https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=true" ".\\tmp\\mariadb-ver.json"
 	POWERSHELL -Command ^
 	  "$content=Get-Content -Path .\\tmp\\mariadb-ver.json | Out-String;" ^
 	  "$matches=[regex]::matches($content, $Env:release_number_regex);" ^
@@ -656,6 +703,7 @@ IF NOT !mariadb_net_versions_count! GTR 0 (
 	  SET /a mariadb_net_versions_count+=1
 	  SET "mariadb_net_versions[!mariadb_net_versions_count!]=%%a"
 	)
+	
 	DEL .\\tmp\\mariadb-ver.json
 	DEL.\\tmp\\temp.txt
 )
@@ -785,7 +833,7 @@ IF NOT "!valid_version!" == "true" (
 )
 
 ECHO Getting mirror...
-POWERSHELL -Command "Invoke-WebRequest -Uri https://downloads.mariadb.org/rest-api/mariadb/!choosen_mariadb_version!/downloads-form/ -OutFile .\\tmp\\mirror.json"
+CALL :download_file "https://downloads.mariadb.org/rest-api/mariadb/!choosen_mariadb_version!/downloads-form/" ".\\tmp\\mirror.json"
 POWERSHELL -Command ^
 	"$content=Get-Content -Path .\\tmp\\mirror.json -Raw;" ^
 	"$data=ConvertFrom-Json -InputObject $content;" ^
@@ -848,6 +896,7 @@ DEL .\\tmp\\mirror.json
 IF NOT EXIST .\\tmp\\mariadb-!choosen_mariadb_version!.zip (
 	POWERSHELL -Command "$res=Invoke-WebRequest -Method HEAD -Uri '!mirror_url!!file_path!'; Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt"
 	SET /p filesize=<.\\tmp\\temp.txt
+	DEL .\\tmp\\temp.txt
 	SET y=false
 	SET /p continue=You need download !filesize! MiB file. Continue? [Y/N] 
 	IF "!continue!" == "y" (
@@ -857,7 +906,7 @@ IF NOT EXIST .\\tmp\\mariadb-!choosen_mariadb_version!.zip (
 	)
 	IF "!y!" == "true" (		
 		ECHO Downloading MariaDB-!choosen_mariadb_version!...
-		POWERSHELL -Command "Invoke-WebRequest -Uri '!mirror_url!!file_path!' -OutFile .\\tmp\\mariadb-!choosen_mariadb_version!.zip"
+		CALL :download_file "!mirror_url!!file_path!" ".\\tmp\\mariadb-!choosen_mariadb_version!.zip"
 	) ELSE (
 		ECHO Cancelled.
 		PAUSE
@@ -896,8 +945,16 @@ GOTO mariadb_menu
 :mariadb_set_default_version
 ECHO Getting installed MariaDB versions...
 CALL :mariadb_get_local_versions
+POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'mariadb=mariadb-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"mariadb-$ver\"} else {Write-Output mariadb-0.0.0}" > .\\tmp\\temp.txt
+SET /p mariadb_ver=<.\\tmp\\temp.txt
+DEL .\\tmp\\temp.txt
+
 FOR /L %%i IN (1,1,%mariadb_local_versions_count%) DO (
-	ECHO MariaDB-!mariadb_local_versions[%%i]!
+	IF "mariadb-!mariadb_local_versions[%%i]!" == "!mariadb_ver!" (
+		ECHO MariaDB-!mariadb_local_versions[%%i]! [DEFAULT]
+	) ELSE (
+		ECHO MariaDB-!mariadb_local_versions[%%i]!
+	)
 )
 SET /p choosen_mariadb_version=Set MariaDB version as default: 
 SET installed=false
