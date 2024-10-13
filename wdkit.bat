@@ -694,6 +694,139 @@ FOR /L %%i IN (1,1,!mariadb_local_versions_count!) DO (
 )
 EXIT /b
 
+:mysql_install
+CALL :print_mariadb_version
+SET /p choosen_mariadb_version=Download MariaDB Version: 
+SET valid_version=false
+SET installed=false
+
+ECHO Validating version...
+
+FOR /L %%i IN (1,1,!mariadb_local_versions_count!) DO (
+	IF "!mariadb_local_versions[%%i]!" == "!choosen_mariadb_version!" (
+		SET installed=true
+	)
+)
+IF "!installed!" == "true" (
+	ECHO MariaDB-!choosen_mariadb_version! already installed
+	PAUSE
+	GOTO mysql_menu
+)
+FOR /L %%i IN (1,1,!mariadb_net_versions_count!) DO (
+	IF !mariadb_net_versions[%%i]! == !choosen_mariadb_version! (
+		SET valid_version=true
+	)
+)
+IF NOT "!valid_version!" == "true" (
+	ECHO MariaDB-!choosen_mariadb_version! not found in repository
+	PAUSE
+	GOTO mysql_menu
+)
+
+ECHO Getting mirror...
+POWERSHELL -Command "Invoke-WebRequest -Uri https://downloads.mariadb.org/rest-api/mariadb/!choosen_mariadb_version!/downloads-form/ -OutFile .\\tmp\\mirror.json"
+POWERSHELL -Command ^
+	"$content=Get-Content -Path .\\tmp\\mirror.json -Raw;" ^
+	"$data=ConvertFrom-Json -InputObject $content;" ^
+	"$file_mirrors=$data.release_data.files[0].mirrors;" ^
+	"$closest_mirrors=$data.release_data.closest_mirrors;" ^
+	"$avail_mirrors=@();" ^
+	"foreach($fm in $file_mirrors) {" ^
+	"    foreach($prop in $fm.PSObject.Properties) {" ^
+	"        foreach($child in $prop.Value.children) {" ^
+	"            $mirror=@{};" ^
+	"            $mirror.country=$child.country;" ^
+	"            $mirror.url=$child.mirror_url;" ^
+	"            $avail_mirrors+=$mirror;" ^
+	"        }" ^
+	"    }" ^
+	"}" ^
+	"$matched_mirrors = @();" ^
+	"foreach ($cm in $closest_mirrors) {" ^
+	"    $match = $avail_mirrors | Where-Object { $_.url -eq $cm.mirror_url };" ^
+	"    if ($match) { $matched_mirrors += $match }" ^
+	"}" ^
+	"Write-Output $matched_mirrors[0].url | Set-Content -Path .\\tmp\\temp.txt"
+SET /p mirror_url=<.\\tmp\\temp.txt
+POWERSHELL -Command ^
+	"$arch_code='x86';" ^
+	"$arch='!PROCESSOR_ARCHITECTURE!';" ^
+	"if($arch -eq 'AMD64') {$arch_code='x86_64'}" ^
+	"$content=Get-Content -Path .\\tmp\\mirror.json -Raw;" ^
+	"$data=ConvertFrom-Json -InputObject $content;" ^
+	"$files=$data.release_data.files;" ^
+	"$file_path='';" ^
+	"foreach($file in $files) {" ^
+	"    if($file.os_code -eq 'windows' -and $file.package_type_code -eq 'zip' -and $file.cpu -eq $arch_code) {" ^
+	"        $matches=[regex]::matches($file.file_name, 'win(.+)\.zip');" ^
+	"        $m=$matches.Groups[1];" ^
+	"        if(($m -replace '-','') -eq $m) {" ^
+	"            $file_path=$file.full_path;" ^
+	"        }" ^
+	"    }" ^
+	"}" ^
+	"Write-Output $file_path | Set-Content .\\tmp\\temp.txt;"
+SET /p file_path=<.\\tmp\\temp.txt
+IF "!file_path!" == "" (
+	SET arch=!PROCESSOR_ARCHITECTURE!
+	IF "!PROCESSOR_ARCHITECTURE!" == "AMD64" (
+		SET arch=x86_64
+	) ELSE IF "!PROCESSOR_ARCHITECTURE!" == "x86" (
+		SET arch=x86
+	)
+	ECHO Cannot get file for Windows-!arch!
+	PAUSE
+	GOTO mysql_menu
+)
+POWERSHELL -Command "$matches=[regex]::matches('!file_path!', '(mariadb-!choosen_mariadb_version!-.+)\.zip$'); $dname=''; if($matches.Groups.Length -gt 0) { $dname=$matches.Groups[1].Value }; Write-Output $dname | Set-Content .\\tmp\\temp.txt"
+SET /p dname=<.\\tmp\\temp.txt
+
+DEL .\\tmp\\temp.txt
+DEL .\\tmp\\mirror.json
+
+IF NOT EXIST .\\tmp\\mariadb-!choosen_mariadb_version!.zip (
+	POWERSHELL -Command "$res=Invoke-WebRequest -Method HEAD -Uri '!mirror_url!!file_path!'; Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt"
+	SET /p filesize=<.\\tmp\\temp.txt
+	SET y=false
+	SET /p continue=You need download !filesize! MiB file. Continue? [Y/N] 
+	IF "!continue!" == "y" (
+		SET y=true
+	) ELSE IF "!continue!" == "Y" (
+		SET y=true
+	)
+	IF "!y!" == "true" (		
+		ECHO Downloading MariaDB-!choosen_mariadb_version!...
+		POWERSHELL -Command "Invoke-WebRequest -Uri '!mirror_url!!file_path!' -OutFile .\\tmp\\mariadb-!choosen_mariadb_version!.zip"
+	) ELSE (
+		ECHO Cancelled.
+		PAUSE
+		GOTO mysql_menu
+	)
+)
+
+ECHO Unzipping...
+CALL :unzipper ".\\tmp\\mariadb-!choosen_mariadb_version!.zip\\!dname!" ".\\mariadb\\mariadb-!choosen_mariadb_version!"
+
+IF EXIST .\\mariadb\\mariadb-!choosen_mariadb_version!\\bin\\mysqld.exe (
+	POWERSHELL -Command ".\\mariadb\\mariadb-!choosen_mariadb_version!\\bin\\mysql_install_db.exe"
+	IF EXIST .\\mariadb\\mariadb-!choosen_mariadb_version!\\data (
+		XCOPY /s /i .\\mariadb\\mariadb-!choosen_mariadb_version!\\data .\\mariadb\\mariadb-!choosen_mariadb_version!\\backup
+	)
+	CALL :mariadb_create_default_bin
+	ECHO MariaDB-!choosen_mariadb_version! installed.
+) ELSE (
+	IF EXIST .\\mariadb\\mariadb-!choosen_mariadb_version! (
+		RMDIR .\\mariadb\\mariadb-!choosen_mariadb_version!
+	)
+	ECHO MariaDB-!choosen_mariadb_version! failed to install.
+)
+
+IF EXIST .\\tmp\\mariadb-!choosen_mariadb_version!.zip (
+	DEL .\\tmp\\mariadb-!choosen_mariadb_version!.zip
+)
+PAUSE
+GOTO mysql_menu
+
 :mysql_version
 CALL :print_mariadb_version
 PAUSE
