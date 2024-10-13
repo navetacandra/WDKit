@@ -28,7 +28,7 @@ ECHO 3. MySQL/MariaDB
 ECHO 4. Exit
 CHOICE /C 1234 /M "Pilih menu"
 IF ERRORLEVEL 4 GOTO exit
-IF ERRORLEVEL 3 GOTO mysql_menu
+IF ERRORLEVEL 3 GOTO mariadb_menu
 IF ERRORLEVEL 2 GOTO apache_menu
 IF ERRORLEVEL 1 GOTO php_menu
 
@@ -38,7 +38,7 @@ IF NOT EXIST ".\\tmp\\" (MKDIR ".\\tmp\\")
 IF NOT EXIST ".\\php\\" (
 	MKDIR ".\\php\\"
 ) ELSE (
-	CALL :get_local_php_versions
+	CALL :php_get_local_versions
 	IF %php_local_versions_count% GTR 0 AND NOT EXIST ".\\php\\bin" (
 		MKDIR ".\\php\\bin"
 	)
@@ -85,14 +85,14 @@ ECHO 4. Uninstall
 ECHO 5. Back
 CHOICE /C 12345 /M "Pilih menu"
 IF ERRORLEVEL 5 GOTO main_menu
-IF ERRORLEVEL 4 GOTO uninstall_php
+IF ERRORLEVEL 4 GOTO php_uninstall
 IF ERRORLEVEL 3 GOTO php_set_default_version
 IF ERRORLEVEL 2 GOTO php_version
 IF ERRORLEVEL 1 GOTO php_install
 PAUSE
 GOTO main_menu
 
-:get_net_php_versions
+:php_get_net_versions
 IF NOT DEFINED php_net_versions[1] (
 	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://windows.php.net/downloads/releases/archives/ -OutFile .\\tmp\\php_archives_version.html"
 	POWERSHELL -Command ^
@@ -129,7 +129,7 @@ IF NOT DEFINED php_net_versions[1] (
 )
 EXIT /b
 
-:get_local_php_versions
+:php_get_local_versions
 POWERSHELL -Command "$content = Get-ChildItem -Path '.\\php' -Directory; $matches = [regex]::matches($content, 'php-([0-9\.]+)'); $versions = @(); foreach($match in $matches) {$versions += $match.Groups[1].Value}; Write-Output $versions" > .\\tmp\\temp.txt
 SET php_local_versions=
 SET php_local_versions_count=0
@@ -140,10 +140,10 @@ for /f "delims=" %%a in (.\\tmp\\temp.txt) do (
 DEL .\\tmp\\temp.txt
 EXIT /b
 
-:print_php_versions
+:php_print_versions
 ECHO Fetching PHP Versions...
-CALL :get_net_php_versions
-CALL :get_local_php_versions
+CALL :php_get_net_versions
+CALL :php_get_local_versions
 FOR /L %%i IN (1,1,%php_net_versions_count%) DO (
 	SET installed=false
 	FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
@@ -161,8 +161,8 @@ FOR /L %%i IN (1,1,%php_local_versions_count%) DO (
 )
 EXIT /b
 
-:create_default_php_bin
-CALL :get_local_php_versions
+:php_create_default_bin
+CALL :php_get_local_versions
 POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'php=php-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"php-$ver\"} else {Write-Output php-0.0.0}" > .\\tmp\\temp.txt
 SET /p php_ver=<.\\tmp\\temp.txt
 DEL .\\tmp\\temp.txt
@@ -206,12 +206,12 @@ IF %php_path% NEQ 0 (
 	ECHO %php_ver% set as default.
 ) ELSE (
 	POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-!php_local_versions[%php_local_versions_count%]!' | Set-Content .\\default.conf"
-	GOTO create_default_php_bin
+	GOTO php_create_default_bin
 )
 EXIT /b
 
 :php_install
-CALL :print_php_versions
+CALL :php_print_versions
 SET /p choosen_php_version=Download PHP Version: 
 SET archived=true
 
@@ -220,10 +220,9 @@ ECHO Validating version..
 SET valid_version=false
 FOR /L %%i IN (1,1,%php_net_versions_count%) DO (
 	IF "!php_net_versions[%%i]!" == "%choosen_php_version%" (
+		SET installed=
 		FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
-			IF "!php_net_versions[%%i]!" == "!php_local_versions[%%j]!" (
-				SET installed=true
-			)
+			IF "!php_net_versions[%%i]!" == "!php_local_versions[%%j]!" (SET installed=true)
 		)
 
 		IF "!installed!"=="true" (
@@ -300,7 +299,7 @@ IF EXIST .\\php\\php-!choosen_php_version!\\php.exe (
 	)
 	ECHO PHP !choosen_php_version! installed.
 	ECHO Update default php version...
-	CALL :create_default_php_bin
+	CALL :php_create_default_bin
 ) ELSE (
 	IF EXIST .\\php\\php-!choosen_php_version! (
 		RMDIR /S /Q .\\php\\php-!choosen_php_version!
@@ -311,13 +310,13 @@ PAUSE
 GOTO php_menu
 
 :php_version
-CALL :print_php_versions
+CALL :php_print_versions
 PAUSE
 GOTO php_menu
 
 :php_set_default_version
 ECHO Getting installed PHP versions...
-CALL :get_local_php_versions
+CALL :php_get_local_versions
 FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
 	ECHO PHP-!php_local_versions[%%j]!
 )
@@ -332,15 +331,15 @@ FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
 IF "%installed%" == "true" (
 	ECHO Update default php version...
 	POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-%choosen_php_version%' | Set-Content .\\default.conf"
-	CALL :create_default_php_bin
+	CALL :php_create_default_bin
 ) ELSE (
 	ECHO PHP-%choosen_php_version% is not installed.
 )
 PAUSE
 GOTO :php_menu
 
-:uninstall_php
-CALL :get_local_php_versions
+:php_uninstall
+CALL :php_get_local_versions
 FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
 	ECHO PHP-!php_local_versions[%%j]!
 )
@@ -366,7 +365,7 @@ IF "%installed%" == "true" (
 		RMDIR /S /Q .\\php\\php-%choosen_php_version%\\
 		ECHO Uninstall PHP-%choosen_php_version% successful.
 		ECHO Update default php version...
-		CALL :create_default_php_bin
+		CALL :php_create_default_bin
 	) ELSE (
 		ECHO Uninstallation cancelled.
 	)
@@ -605,7 +604,7 @@ IF "%y%" == "true" (
 PAUSE
 GOTO apache_menu
 
-:mysql_menu
+:mariadb_menu
 CLS
 ECHO ========================================================
 ECHO					  MYSQL MENU
@@ -621,17 +620,17 @@ ECHO 7. Uninstall
 ECHO 8. Back
 CHOICE /C 12345678 /M "Pilih menu"
 IF ERRORLEVEL 8 GOTO main_menu
-IF ERRORLEVEL 7 GOTO mysql_uninstall
+IF ERRORLEVEL 7 GOTO mariadb_uninstall
 IF ERRORLEVEL 6 GOTO mariadb_stop
 IF ERRORLEVEL 5 GOTO mariadb_restart
 IF ERRORLEVEL 4 GOTO mariadb_start
-IF ERRORLEVEL 3 GOTO mysql_set_default_version
-IF ERRORLEVEL 2 GOTO mysql_version
-IF ERRORLEVEL 1 GOTO mysql_install
+IF ERRORLEVEL 3 GOTO mariadb_set_default_version
+IF ERRORLEVEL 2 GOTO mariadb_version
+IF ERRORLEVEL 1 GOTO mariadb_install
 PAUSE
 GOTO main_menu
 
-:get_local_mariadb_versions
+:mariadb_get_local_versions
 POWERSHELL -Command "$content = Get-ChildItem -Path '.\\mariadb' -Directory; $matches = [regex]::matches($content, 'mariadb-([0-9\.]+)'); $versions = @(); foreach($match in $matches) {$versions += $match.Groups[1].Value}; Write-Output $versions" > .\\tmp\\temp.txt
 SET mariadb_local_versions=
 SET mariadb_local_versions_count=0
@@ -642,7 +641,7 @@ FOR /f "delims=" %%a IN (.\\tmp\\temp.txt) DO (
 DEL .\\tmp\\temp.txt
 EXIT /b
 
-:get_net_mariadb_versions
+:mariadb_get_net_versions
 IF NOT !mariadb_net_versions_count! GTR 0 (
 	SET release_number_regex="release_number": "([0-9\.]+)"
 	POWERSHELL -Command "Invoke-WebRequest -Uri 'https://downloads.mariadb.org/rest-api/mariadb/all-releases/?olderReleases=true' -MaximumRedirection 5 -OutFile.\\tmp\\mariadb-ver.json"
@@ -662,10 +661,10 @@ IF NOT !mariadb_net_versions_count! GTR 0 (
 )
 EXIT /b
 
-:print_mariadb_version
+:mariadb_print_versions
 ECHO Fetching MariaDB Versions...
-CALL :get_local_mariadb_versions
-CALL :get_net_mariadb_versions
+CALL :mariadb_get_local_versions
+CALL :mariadb_get_net_versions
 FOR /L %%i IN (1,1,!mariadb_net_versions_count!) DO (
 	SET installed=false
 	FOR /L %%j IN (1,1,!mariadb_local_versions_count!) DO (
@@ -695,7 +694,7 @@ FOR /L %%i IN (1,1,!mariadb_local_versions_count!) DO (
 EXIT /b
 
 :mariadb_create_default_bin
-CALL :get_local_mariadb_versions
+CALL :mariadb_get_local_versions
 POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'mariadb=mariadb-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"mariadb-$ver\"} else {Write-Output mariadb-0.0.0}" > .\\tmp\\temp.txt
 SET /p mariadb_ver=<.\\tmp\\temp.txt
 DEL .\\tmp\\temp.txt
@@ -718,7 +717,7 @@ IF "!mariadb_ver!"=="mariadb-0.0.0" (
 	) ELSE (
 		ECHO MariaDB not installed.
 		PAUSE
-		GOTO mysql_menu
+		GOTO mariadb_menu
 	)
 )
 
@@ -756,8 +755,8 @@ IF !count! GTR 0 (
 )
 EXIT /b
 
-:mysql_install
-CALL :print_mariadb_version
+:mariadb_install
+CALL :mariadb_print_versions
 SET /p choosen_mariadb_version=Download MariaDB Version: 
 SET valid_version=false
 SET installed=false
@@ -772,7 +771,7 @@ FOR /L %%i IN (1,1,!mariadb_local_versions_count!) DO (
 IF "!installed!" == "true" (
 	ECHO MariaDB-!choosen_mariadb_version! already installed
 	PAUSE
-	GOTO mysql_menu
+	GOTO mariadb_menu
 )
 FOR /L %%i IN (1,1,!mariadb_net_versions_count!) DO (
 	IF !mariadb_net_versions[%%i]! == !choosen_mariadb_version! (
@@ -782,7 +781,7 @@ FOR /L %%i IN (1,1,!mariadb_net_versions_count!) DO (
 IF NOT "!valid_version!" == "true" (
 	ECHO MariaDB-!choosen_mariadb_version! not found in repository
 	PAUSE
-	GOTO mysql_menu
+	GOTO mariadb_menu
 )
 
 ECHO Getting mirror...
@@ -838,7 +837,7 @@ IF "!file_path!" == "" (
 	)
 	ECHO Cannot get file for Windows-!arch!
 	PAUSE
-	GOTO mysql_menu
+	GOTO mariadb_menu
 )
 POWERSHELL -Command "$matches=[regex]::matches('!file_path!', '(mariadb-!choosen_mariadb_version!-.+)\.zip$'); $dname=''; if($matches.Groups.Length -gt 0) { $dname=$matches.Groups[1].Value }; Write-Output $dname | Set-Content .\\tmp\\temp.txt"
 SET /p dname=<.\\tmp\\temp.txt
@@ -862,7 +861,7 @@ IF NOT EXIST .\\tmp\\mariadb-!choosen_mariadb_version!.zip (
 	) ELSE (
 		ECHO Cancelled.
 		PAUSE
-		GOTO mysql_menu
+		GOTO mariadb_menu
 	)
 )
 
@@ -887,16 +886,16 @@ IF EXIST .\\tmp\\mariadb-!choosen_mariadb_version!.zip (
 	DEL .\\tmp\\mariadb-!choosen_mariadb_version!.zip
 )
 PAUSE
-GOTO mysql_menu
+GOTO mariadb_menu
 
-:mysql_version
-CALL :print_mariadb_version
+:mariadb_version
+CALL :mariadb_print_versions
 PAUSE
-GOTO mysql_menu
+GOTO mariadb_menu
 
-:mysql_set_default_version
+:mariadb_set_default_version
 ECHO Getting installed MariaDB versions...
-CALL :get_local_mariadb_versions
+CALL :mariadb_get_local_versions
 FOR /L %%i IN (1,1,%mariadb_local_versions_count%) DO (
 	ECHO MariaDB-!mariadb_local_versions[%%i]!
 )
@@ -910,19 +909,19 @@ FOR /L %%i IN (1,1,%mariadb_local_versions_count%) DO (
 IF "%installed%" == "false" (
 	ECHO MariaDB-!choosen_mariadb_version! is not installed.
 	PAUSE
-	GOTO mysql_menu
+	GOTO mariadb_menu
 )
 ECHO Update default MariaDB version...
 POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'mariadb=(mariadb-([0-9.]*))?', 'mariadb=mariadb-!choosen_mariadb_version!' | Set-Content .\\default.conf"
 CALL :mariadb_create_default_bin
 PAUSE
-GOTO mysql_menu
+GOTO mariadb_menu
 
 :mariadb_start
 IF NOT EXIST .\\mariadb\\bin\\mysqld.bat (
 	ECHO MariaDB is not installed
 	PAUSE
-	GOTO mysql_menu
+	GOTO mariadb_menu
 )
 
 POWERSHELL -Command "tasklist | findstr /i mysqld | Select-Object -First 1" > .\\tmp\temp.txt
@@ -941,13 +940,13 @@ IF !count!==0 (
 )
 CALL :mariadb_status
 PAUSE
-GOTO mysql_menu
+GOTO mariadb_menu
 
 :mariadb_stop
 IF NOT EXIST .\\mariadb\\bin\\mysqld.bat (
 	ECHO MariaDB is not installed
 	PAUSE
-	GOTO mysql_menu
+	GOTO mariadb_menu
 )
 
 POWERSHELL -Command "tasklist | findstr /i mysqld | Select-Object -First 1" > .\\tmp\temp.txt
@@ -961,13 +960,13 @@ IF !count! GTR 0 (
 )
 CALL :mariadb_status
 PAUSE
-GOTO mysql_menu
+GOTO mariadb_menu
 
 :mariadb_restart
 IF NOT EXIST .\\mariadb\\bin\\mysqld.bat (
 	ECHO MariaDB is not installed
 	PAUSE
-	GOTO mysql_menu
+	GOTO mariadb_menu
 )
 
 POWERSHELL -Command "tasklist | findstr /i mysqld | Select-Object -First 1" > .\\tmp\temp.txt
@@ -987,10 +986,10 @@ IF EXIST .\\mariadb\\bin\\mysqld.bat (
 )
 CALL :mariadb_status
 PAUSE
-GOTO mysql_menu
+GOTO mariadb_menu
 
-:mysql_uninstall
-CALL :get_local_mariadb_versions
+:mariadb_uninstall
+CALL :mariadb_get_local_versions
 FOR /L %%j IN (1,1,!mariadb_local_versions_count!) DO (
 	ECHO MariaDB-!mariadb_local_versions[%%j]!
 )
@@ -1006,7 +1005,7 @@ FOR /L %%j IN (1,1,!mariadb_local_versions_count!) DO (
 IF "!installed!" == "false" (
 	ECHO MariaDB-!choosen_mariadb_version! is not installed.
 	PAUSE
-	GOTO mysql_menu
+	GOTO mariadb_menu
 )
 
 SET y=false
@@ -1037,7 +1036,7 @@ IF "!y!" == "true" (
 	ECHO Uninstallation cancelled.
 )
 PAUSE
-GOTO mysql_menu
+GOTO mariadb_menu
 
 :exit
 exit /b 0
