@@ -2,6 +2,8 @@
 SETLOCAL EnableDelayedExpansion
 CD /d "%~dp0"
 
+GOTO :prepare_directory
+
 :main_menu
 CLS
 ECHO ========================================================
@@ -16,6 +18,47 @@ IF ERRORLEVEL 4 GOTO exit
 IF ERRORLEVEL 3 GOTO mysql_menu
 IF ERRORLEVEL 2 GOTO apache_menu
 IF ERRORLEVEL 1 GOTO php_menu
+
+:prepare_directory
+IF NOT EXIST ".\\default.conf" (COPY NUL ".\\default.conf")
+IF NOT EXIST ".\\tmp\\" (MKDIR ".\\tmp\\")
+IF NOT EXIST ".\\php\\" (
+	MKDIR ".\\php\\"
+) ELSE (
+	CALL :get_local_php_versions
+	IF %php_local_versions_count% GTR 0 AND NOT EXIST ".\\php\\bin" (
+		MKDIR ".\\php\\bin"
+	)
+)
+IF NOT EXIST ".\\apache\\" (
+	MKDIR ".\\apache\\"
+)
+IF NOT EXIST ".\\htdocs\\" (
+	MKDIR ".\\htdocs\\"
+	POWERSHELL -Command "Write-Output '<html><body><h1>It works!</h1></body></html>' | Set-Content .\\htdocs\\index.html"
+)
+IF NOT EXIST ".\\mariadb\\" (MKDIR ".\\mariadb\\")
+IF NOT EXIST ".\\postgres\\" (MKDIR ".\\postgres\\")
+GOTO main_menu
+
+:unzipper
+IF NOT EXIST "%~f2" (MKDIR "%~f2")
+POWERSHELL -Command ^
+	"$shell = New-Object -ComObject shell.application;" ^
+	"$zip = $shell.NameSpace('%~f1');" ^
+	"if ($zip -ne $null) { " ^
+	"	foreach ($item in $zip.items()) {" ^
+	"		$shell.Namespace('%~f2').CopyHere($item);" ^
+	"	} " ^
+	"} else {" ^
+	" Write-Host 'Error: Could not find zip file.'}"
+IF %ERRORLEVEL% NEQ 0 (
+	RMDIR "%~f2"
+	ECHO Failed to unzip
+) ELSE (
+	DEL %~f1
+)
+EXIT /b
 
 :php_menu
 CLS
