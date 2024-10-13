@@ -1,5 +1,14 @@
 @echo off
 SETLOCAL EnableDelayedExpansion
+SET userAgent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.3
+SET php_local_versions_count=0
+SET php_net_versions_count=0
+SET php_net_archive_versions_count=0
+SET php_net_release_versions_count=0
+SET php_local_versions=
+SET php_net_versions=
+SET php_net_release_versions=
+SET php_net_archive_versions=
 CD /d "%~dp0"
 
 GOTO :prepare_directory
@@ -78,6 +87,80 @@ IF ERRORLEVEL 2 GOTO php_version
 IF ERRORLEVEL 1 GOTO dowload_and_install_php
 PAUSE
 GOTO main_menu
+
+:get_net_php_versions
+IF NOT DEFINED php_net_versions[1] (
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://windows.php.net/downloads/releases/archives/ -OutFile .\\tmp\\php_archives_version.html"
+	POWERSHELL -Command ^
+		"$content=Get-Content -Path .\\tmp\\php_archives_version.html | Out-String;" ^
+		"$matches=[regex]::matches($content, '/downloads/releases/archives/php-([0-9\.]+)-Win32-(vc|vs|VC|VS)\d+-x(86|64).zip');" ^
+		"$versions=@();" ^
+		"foreach($match in $matches) { $versions+=$match.Groups[1].Value };" ^
+		"$versions = $versions | Sort-Object -Unique; Write-Output $versions" > .\\tmp\temp.txt
+	DEL .\\tmp\\php_archives_version.html
+	POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://windows.php.net/downloads/releases/ -OutFile .\\tmp\\php_releases_version.html"
+	FOR /f "delims=" %%a IN (.\\tmp\\temp.txt) DO (
+		SET /a php_net_archive_versions_count+=1
+		SET "php_net_archive_versions[!php_net_archive_versions_count!]=%%a"
+		SET /a php_net_versions_count+=1
+		SET "php_net_versions[!php_net_versions_count!]=%%a"
+	)
+	DEL .\\tmp\\temp.txt
+	
+	POWERSHELL -Command ^
+		"$content=Get-Content -Path .\\tmp\\php_releases_version.html | Out-String;" ^
+		"$matches=[regex]::matches($content, '/downloads/releases/php-([0-9\.]+)-Win32-(vc|vs|VC|VS)\d+-x(86|64).zip');" ^
+		"$versions=@();" ^
+		"foreach($match in $matches) { $versions+=$match.Groups[1].Value };" ^
+		"$versions = $versions | Sort-Object -Unique; Write-Output $versions" >> .\\tmp\temp.txt
+	DEL .\\tmp\\php_releases_version.html
+	POWERSHELL -Command "Get-Content -Path .\\tmp\\temp.txt | Sort-Object -Property {[version]$_.Trim()} | Set-Content -Path .\\tmp\\temp.txt"
+	FOR /f "delims=" %%a IN (.\\tmp\\temp.txt) DO (
+		SET /a php_net_release_versions_count+=1
+		SET "php_net_release_versions[!php_net_release_versions_count!]=%%a"
+		SET /a php_net_versions_count+=1
+		SET "php_net_versions[!php_net_versions_count!]=%%a"
+	)
+	DEL .\\tmp\\temp.txt
+)
+EXIT /b
+
+:get_local_php_versions
+POWERSHELL -Command "$content = Get-ChildItem -Path '.\\php' -Directory; $matches = [regex]::matches($content, 'php-([0-9\.]+)'); $versions = @(); foreach($match in $matches) {$versions += $match.Groups[1].Value}; Write-Output $versions" > .\\tmp\\temp.txt
+SET php_local_versions=
+SET php_local_versions_count=0
+for /f "delims=" %%a in (.\\tmp\\temp.txt) do (
+	SET /a php_local_versions_count += 1
+	SET "php_local_versions[!php_local_versions_count!]=%%a"
+)
+DEL .\\tmp\\temp.txt
+EXIT /b
+
+:print_php_versions
+ECHO Fetching PHP Versions...
+CALL :get_net_php_versions
+CALL :get_local_php_versions
+FOR /L %%i IN (1,1,%php_net_versions_count%) DO (
+	SET installed=false
+	FOR /L %%j IN (1,1,%php_local_versions_count%) DO (
+		IF "!php_net_versions[%%i]!" == "!php_local_versions[%%j]!" (
+			SET installed=true
+		)
+	)
+
+	IF "!installed!"=="false" (
+		ECHO PHP version: !php_net_versions[%%i]!
+	)
+)
+FOR /L %%i IN (1,1,%php_local_versions_count%) DO (
+	ECHO PHP version: !php_local_versions[%%i]! [INSTALLED]
+)
+EXIT /b
+
+:php_version
+CALL :print_php_versions
+PAUSE
+GOTO php_menu
 
 :apache_menu
 CLS
