@@ -301,7 +301,6 @@ IF !count! LSS 1 (
 
 IF NOT EXIST .\\tmp\\php-!choosen_php_version!.zip (
 	SET arch=x64
-	ECHO Downloading PHP-!choosen_php_version!...
 	IF "%PROCESSOR_ARCHITECTURE%"=="x86" (
 		SET arch=x86
 	)
@@ -315,11 +314,26 @@ IF NOT EXIST .\\tmp\\php-!choosen_php_version!.zip (
 	
 	POWERSHELL -Command ^
 		"try {" ^
-		"	$res=Invoke-WebRequest -Method HEAD -Uri 'https://windows.php.net!download_path!';" ^
-		"	Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt " ^
-		"} catch { " ^
-		"	Write-Output '?' | Set-Content .\\tmp\\temp.txt;" ^
-		"	Write-Host \"Can't get file size\";" ^
+		"    $request = [System.Net.WebRequest]::Create('https://windows.php.net!download_path!');" ^
+		"    $request.Method = 'HEAD';" ^
+		"    $request.UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0';" ^
+		"    $request.Headers.Add('Accept-Language', 'en-US,en;q=0.9,id;q=0.8');" ^
+		"    $request.Headers.Add('DNT', '1');" ^
+		"    $request.Headers.Add('Sec-Fetch-Dest', 'document');" ^
+		"    $request.Headers.Add('Sec-Fetch-Mode', 'navigate');" ^
+		"    $request.Headers.Add('Sec-Fetch-Site', 'none');" ^
+		"    $request.Headers.Add('Sec-Fetch-User', '?1');" ^
+		"    $request.Headers.Add('Upgrade-Insecure-Requests', '1');" ^
+		"    $request.Headers.Add('sec-ch-ua', '\"Microsoft Edge\";v=\"129\", \"Not=A?Brand\";v=\"8\", \"Chromium\";v=\"129\"');" ^
+		"    $request.Headers.Add('sec-ch-ua-mobile', '?0');" ^
+		"    $request.Headers.Add('sec-ch-ua-platform', 'Windows');" ^
+		"    $response = $request.GetResponse();" ^
+		"    $headers = $response.Headers;" ^
+		"    $response.Close();" ^
+		"    Write-Output ([Math]::Round($headers.Get('Content-Length')/1000000, 2)) | Set-Content .\\tmp\\temp.txt;" ^
+		"} catch {" ^
+		"    Write-Output '?' | Set-Content .\\tmp\\temp.txt;" ^
+		"    Write-Host \"Can't get file size\";" ^
 		"}"
 	SET /p filesize=<.\\tmp\\temp.txt
 	DEL .\\tmp\\temp.txt
@@ -332,6 +346,7 @@ IF NOT EXIST .\\tmp\\php-!choosen_php_version!.zip (
 	)
 
 	IF "!y!" == "true" (
+		ECHO Downloading PHP-!choosen_php_version!...
 		CALL :download_file "https://windows.php.net!download_path!" ".\\tmp\\php-!choosen_php_version!.zip"
 	) ELSE (
 		ECHO Cancelled.
@@ -548,11 +563,26 @@ IF NOT EXIST .\\tmp\\apache.zip (
 	DEL .\\tmp\\temp.txt
 	POWERSHELL -Command ^
 		"try {" ^
-		"	$res=Invoke-WebRequest -Method HEAD -Uri 'https://www.apachelounge.com!download_path!';" ^
-		"	Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt " ^
-		"} catch { " ^
-		"	Write-Output '?' | Set-Content .\\tmp\\temp.txt;" ^
-		"	Write-Host \"Can't get file size\";" ^
+		"    $request = [System.Net.WebRequest]::Create('https://www.apachelounge.com!download_path!');" ^
+		"    $request.Method = 'HEAD';" ^
+		"    $request.UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0';" ^
+		"    $request.Headers.Add('Accept-Language', 'en-US,en;q=0.9,id;q=0.8');" ^
+		"    $request.Headers.Add('DNT', '1');" ^
+		"    $request.Headers.Add('Sec-Fetch-Dest', 'document');" ^
+		"    $request.Headers.Add('Sec-Fetch-Mode', 'navigate');" ^
+		"    $request.Headers.Add('Sec-Fetch-Site', 'none');" ^
+		"    $request.Headers.Add('Sec-Fetch-User', '?1');" ^
+		"    $request.Headers.Add('Upgrade-Insecure-Requests', '1');" ^
+		"    $request.Headers.Add('sec-ch-ua', '\"Microsoft Edge\";v=\"129\", \"Not=A?Brand\";v=\"8\", \"Chromium\";v=\"129\"');" ^
+		"    $request.Headers.Add('sec-ch-ua-mobile', '?0');" ^
+		"    $request.Headers.Add('sec-ch-ua-platform', 'Windows');" ^
+		"    $response = $request.GetResponse();" ^
+		"    $headers = $response.Headers;" ^
+		"    $response.Close();" ^
+		"    Write-Output ([Math]::Round($headers.Get('Content-Length')/1000000, 2)) | Set-Content .\\tmp\\temp.txt;" ^
+		"} catch {" ^
+		"    Write-Output '?' | Set-Content .\\tmp\\temp.txt;" ^
+		"    Write-Host \"Can't get file size\";" ^
 		"}"
 	SET /p filesize=<.\\tmp\\temp.txt
 	SET y=false
@@ -933,11 +963,26 @@ DEL .\\tmp\\mirror.json
 IF NOT EXIST .\\tmp\\mariadb-!choosen_mariadb_version!.zip (
 	POWERSHELL -Command ^
 		"try {" ^
-		"	$res=Invoke-WebRequest -Method HEAD -Uri '!mirror_url!!file_path!';" ^
-		"	Write-Output ([double]($res.Headers['Content-Length']/1000000)) | Set-Content .\\tmp\\temp.txt " ^
-		"} catch { " ^
-		"	Write-Output '?' | Set-Content .\\tmp\\temp.txt;" ^
-		"	Write-Host \"Can't get file size\";" ^
+		"    $request = [System.Net.WebRequest]::Create('!mirror_url!!file_path!');" ^
+		"    $request.Method = 'HEAD';" ^
+		"    $request.UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0';" ^
+		"    $request.Headers.Add('Accept-Language', 'en-US,en;q=0.9,id;q=0.8');" ^
+		"    $request.Headers.Add('DNT', '1');" ^
+		"    $request.Headers.Add('Sec-Fetch-Dest', 'document');" ^
+		"    $request.Headers.Add('Sec-Fetch-Mode', 'navigate');" ^
+		"    $request.Headers.Add('Sec-Fetch-Site', 'none');" ^
+		"    $request.Headers.Add('Sec-Fetch-User', '?1');" ^
+		"    $request.Headers.Add('Upgrade-Insecure-Requests', '1');" ^
+		"    $request.Headers.Add('sec-ch-ua', '\"Microsoft Edge\";v=\"129\", \"Not=A?Brand\";v=\"8\", \"Chromium\";v=\"129\"');" ^
+		"    $request.Headers.Add('sec-ch-ua-mobile', '?0');" ^
+		"    $request.Headers.Add('sec-ch-ua-platform', 'Windows');" ^
+		"    $response = $request.GetResponse();" ^
+		"    $headers = $response.Headers;" ^
+		"    $response.Close();" ^
+		"    Write-Output ([Math]::Round($headers.Get('Content-Length')/1000000, 2)) | Set-Content .\\tmp\\temp.txt;" ^
+		"} catch {" ^
+		"    Write-Output '?' | Set-Content .\\tmp\\temp.txt;" ^
+		"    Write-Host \"Can't get file size\";" ^
 		"}"
 	SET /p filesize=<.\\tmp\\temp.txt
 	DEL .\\tmp\\temp.txt
