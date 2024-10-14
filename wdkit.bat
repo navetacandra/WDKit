@@ -603,7 +603,7 @@ IF !count! GTR 0 (
 EXIT /b
 
 :apache_install
-POWERSHELL -Command "Invoke-WebRequest -UserAgent '%userAgent%' -Uri https://www.apachelounge.com/download/ -OutFile .\\tmp\\apachelounge.html"
+CALL :download_file "https://www.apachelounge.com/download/" ".\\tmp\\apachelounge.html"
 POWERSHELL -Command " $content=Get-Content -Path .\\tmp\\apachelounge.html | Out-String; $matches=[regex]::matches($content, 'Apache ([0-9\.]+) .+ Windows Binaries and Modules'); $ver=$matches.Groups[1].Value -replace '\.', ''; Write-Output \"Apache$ver\"" > .\\tmp\\temp.txt
 SET /p apache_version=<.\\tmp\\temp.txt
 DEL .\\tmp\\temp.txt
