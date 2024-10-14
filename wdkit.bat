@@ -158,7 +158,7 @@ IF NOT DEFINED php_net_versions[1] (
 EXIT /b
 
 :php_get_local_versions
-POWERSHELL -Command "$content = Get-ChildItem -Path '.\\php' -Directory; $matches = [regex]::matches($content, 'php-([0-9\.]+)'); $versions = @(); foreach($match in $matches) {$versions += $match.Groups[1].Value}; Write-Output $versions" > .\\tmp\\temp.txt
+POWERSHELL -Command "$content = Get-ChildItem -Path '.\\php' -Directory | Out-String; $matches = [regex]::matches($content, 'php-([0-9\.]+)'); $versions = @(); foreach($match in $matches) {$versions += $match.Groups[1].Value}; Write-Output $versions" > .\\tmp\\temp.txt
 SET php_local_versions=
 SET php_local_versions_count=0
 for /f "delims=" %%a in (.\\tmp\\temp.txt) do (
@@ -369,6 +369,13 @@ GOTO php_menu
 :php_set_default_version
 ECHO Getting installed PHP versions...
 CALL :php_get_local_versions
+
+IF !php_local_versions_count! LEQ 0 (
+	ECHO PHP not installed.
+	PAUSE
+	GOTO :php_menu
+)
+
 POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'php=php-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"php-$ver\"} else {Write-Output php-0.0.0}" > .\\tmp\\temp.txt
 SET /p php_ver=<.\\tmp\\temp.txt
 DEL .\\tmp\\temp.txt
@@ -708,7 +715,7 @@ PAUSE
 GOTO main_menu
 
 :mariadb_get_local_versions
-POWERSHELL -Command "$content = Get-ChildItem -Path '.\\mariadb' -Directory; $matches = [regex]::matches($content, 'mariadb-([0-9\.]+)'); $versions = @(); foreach($match in $matches) {$versions += $match.Groups[1].Value}; Write-Output $versions" > .\\tmp\\temp.txt
+POWERSHELL -Command "$content = Get-ChildItem -Path '.\\mariadb' -Directory | Out-String; $matches = [regex]::matches($content, 'mariadb-([0-9\.]+)'); $versions = @(); foreach($match in $matches) {$versions += $match.Groups[1].Value}; Write-Output $versions" > .\\tmp\\temp.txt
 SET mariadb_local_versions=
 SET mariadb_local_versions_count=0
 FOR /f "delims=" %%a IN (.\\tmp\\temp.txt) DO (
