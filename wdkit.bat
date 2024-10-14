@@ -453,7 +453,15 @@ FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
 		ECHO PHP-!php_local_versions[%%j]!
 	)
 )
+SET choosen_php_version=
 SET /p choosen_php_version=Set PHP Version as default: 
+FOR /f "tokens=* delims=" %%a IN ("!choosen_php_version!") DO SET choosen_php_version=%%~a
+IF "!choosen_php_version!" == "" (
+  ECHO Version can't be empty
+  PAUSE
+  GOTO mariadb_menu
+)
+
 SET installed=false
 FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
 	IF !php_local_versions[%%j]! == !choosen_php_version! (
@@ -483,7 +491,15 @@ FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
 	ECHO PHP-!php_local_versions[%%j]!
 )
 
+SET choosen_php_version=
 SET /p choosen_php_version=Uninstall PHP Version: 
+FOR /f "tokens=* delims=" %%a IN ("!choosen_php_version!") DO SET choosen_php_version=%%~a
+IF "!choosen_php_version!" == "" (
+  ECHO Version can't be empty
+  PAUSE
+  GOTO mariadb_menu
+)
+
 SET installed=false
 FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
 	IF !php_local_versions[%%j]! == !choosen_php_version! (
@@ -1109,7 +1125,15 @@ FOR /L %%i IN (1,1,!mariadb_local_versions_count!) DO (
 		ECHO MariaDB-!mariadb_local_versions[%%i]!
 	)
 )
+SET choosen_mariadb_version=
 SET /p choosen_mariadb_version=Set MariaDB version as default: 
+FOR /f "tokens=* delims=" %%a IN ("!choosen_mariadb_version!") DO SET choosen_mariadb_version=%%~a
+IF "!choosen_mariadb_version!"=="" (
+  ECHO Version can't be empty
+  PAUSE
+  GOTO mariadb_menu
+)
+
 SET installed=false
 FOR /L %%i IN (1,1,!mariadb_local_versions_count!) DO (
 	IF !mariadb_local_versions[%%i]! == !choosen_mariadb_version! (
@@ -1209,7 +1233,14 @@ FOR /L %%j IN (1,1,!mariadb_local_versions_count!) DO (
 	ECHO MariaDB-!mariadb_local_versions[%%j]!
 )
 
+SET choosen_mariadb_version=
 SET /p choosen_mariadb_version=Uninstall MariaDB Version: 
+FOR /f "tokens=* delims=" %%a IN ("!choosen_mariadb_version!") DO SET choosen_mariadb_version=%%~a
+IF "!choosen_mariadb_version!"=="" (
+  ECHO Version can't be empty
+  PAUSE
+  GOTO mariadb_menu
+)
 SET installed=false
 FOR /L %%j IN (1,1,!mariadb_local_versions_count!) DO (
 	IF !mariadb_local_versions[%%j]! == !choosen_mariadb_version! (
