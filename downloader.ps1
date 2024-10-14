@@ -3,7 +3,7 @@ Param (
 	[string]$filepath
 )
 
-$userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.3"
+$userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0"
 $dname=(Split-Path -Path $filepath)
 $fname=(Split-Path -Path $filepath -Leaf)
 $tempdir = "$dname\$fname-parts"
@@ -12,11 +12,27 @@ if (-not (Test-Path -Path $tempdir)) {
 }
 
 $num_parts = 8
-$headers = (Invoke-WebRequest -Uri $url -Method Head -UserAgent $userAgent).Headers
-if($headers.'Accept-Ranges' -ne 'bytes') {
+$request = [System.Net.WebRequest]::Create($url)
+$request.Method = "HEAD"
+$request.UserAgent = $userAgent
+$request.Headers.Add("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
+$request.Headers.Add("DNT", "1")
+$request.Headers.Add("Sec-Fetch-Dest", "document")
+$request.Headers.Add("Sec-Fetch-Mode", "navigate")
+$request.Headers.Add("Sec-Fetch-Site", "none")
+$request.Headers.Add("Sec-Fetch-User", "?1")
+$request.Headers.Add("Upgrade-Insecure-Requests", "1")
+$request.Headers.Add("sec-ch-ua", "`"Microsoft Edge`";v=`"129`", `"Not=A?Brand`";v=`"8`", `"Chromium`";v=`"129`"")
+$request.Headers.Add("sec-ch-ua-mobile", "?0")
+$request.Headers.Add("sec-ch-ua-platform", "Windows")
+$response = $request.GetResponse()
+$headers = $response.Headers
+$response.Close()
+
+if($headers.Get('Accept-Ranges') -ne 'bytes') {
 	$num_parts = 1
 }
-$filesize = $headers.'Content-Length'
+$filesize = $headers.Get('Content-Length')
 $filesize = [int]$filesize
 
 $part_size = [math]::Ceiling($filesize / $num_parts)
@@ -32,9 +48,7 @@ for ($i = 0; $i -lt $num_parts; $i++) {
 		
 		$request = [System.Net.WebRequest]::Create($url)
 		$request.Method = "GET"
-		$request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0"
-		$request.Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
-		$request.Headers.Add("Accept-Encoding", "gzip, deflate, br, zstd")
+		$request.UserAgent = $userAgent
 		$request.Headers.Add("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
 		$request.Headers.Add("DNT", "1")
 		$request.Headers.Add("Sec-Fetch-Dest", "document")
