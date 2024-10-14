@@ -437,7 +437,6 @@ GOTO php_menu
 :php_set_default_version
 ECHO Getting installed PHP versions...
 CALL :php_get_local_versions
-
 IF !php_local_versions_count! LEQ 0 (
 	ECHO PHP not installed.
 	PAUSE
@@ -474,6 +473,12 @@ GOTO :php_menu
 
 :php_uninstall
 CALL :php_get_local_versions
+IF !php_local_versions_count! LEQ 0 (
+	ECHO PHP not installed.
+	PAUSE
+	GOTO :php_menu
+)
+
 FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
 	ECHO PHP-!php_local_versions[%%j]!
 )
@@ -1087,6 +1092,12 @@ GOTO mariadb_menu
 :mariadb_set_default_version
 ECHO Getting installed MariaDB versions...
 CALL :mariadb_get_local_versions
+IF !mariadb_local_versions_count! LEQ 0 (
+	ECHO MariaDB not installed.
+	PAUSE
+	GOTO :mariadb_menu
+)
+
 POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'mariadb=mariadb-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"mariadb-$ver\"} else {Write-Output mariadb-0.0.0}" > .\\tmp\\temp.txt
 SET /p mariadb_ver=<.\\tmp\\temp.txt
 DEL .\\tmp\\temp.txt
@@ -1189,6 +1200,11 @@ GOTO mariadb_menu
 
 :mariadb_uninstall
 CALL :mariadb_get_local_versions
+IF !mariadb_local_versions_count! LEQ 0 (
+	ECHO MariaDB not installed.
+	PAUSE
+	GOTO :mariadb_menu
+)
 FOR /L %%j IN (1,1,!mariadb_local_versions_count!) DO (
 	ECHO MariaDB-!mariadb_local_versions[%%j]!
 )
