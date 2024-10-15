@@ -15,7 +15,7 @@ SET mariadb_local_versions=
 SET mariadb_net_versions=
 CD /d "%~dp0"
 
-GOTO :prepare_directory
+GOTO prepare_directory
 
 :print_menu_header
 SET title=%1
@@ -24,7 +24,7 @@ SET "length=0"
 FOR /l %%a IN (1,1,100) DO (
     IF "!title:~%%a,1!"=="" (
         SET /a "length=%%a-2"
-        GOTO :break
+        GOTO break
     )
 )
 :break
@@ -316,7 +316,7 @@ FOR /L %%i IN (1,1,!php_net_versions_count!) DO (
 		IF "!installed!"=="true" (
 			ECHO PHP-!choosen_php_version! already installed.
 			PAUSE
-			GOTO :php_menu
+			GOTO php_menu
 		) ELSE (
 			SET valid_version=true
 		)
@@ -418,11 +418,19 @@ IF NOT EXIST .\\tmp\\php-!choosen_php_version!.zip (
 ECHO Unzipping...
 CALL :unzipper ".\\tmp\\php-!choosen_php_version!.zip" ".\\php\\php-!choosen_php_version!\\"
 IF EXIST .\\php\\php-!choosen_php_version!\\php.exe (
-	IF EXIST .\\php\\php-!choosen_php_version!\\php.ini-dist (
-		COPY .\\php\\php-!choosen_php_version!\\php.ini-dist .\\php\\php-!choosen_php_version!\\php.ini
+	IF EXIST .\\php\\php-!choosen_php_version!\\php.ini-development (
+		POWERSHELL -Command ^
+			"$content = Get-Content .\\php\\php-!choosen_php_version!\\php.ini-development | Out-String;" ^
+			"$content = [regex]::Replace($content, ';extension=', 'extension=');" ^
+			"$content = [regex]::Replace($content, ';?extension_dir = \"./\"', 'extension_dir = \"%CD%\\php\\php-!choosen_php_version!\\ext\"');" ^
+			"Write-Output $content | Set-Content .\\php\\php-!choosen_php_version!\\php.ini"
 	)
-	IF EXIST .\\php\\php-!choosen_php_version!\\php.ini-production (
-		COPY .\\php\\php-!choosen_php_version!\\php.ini-production .\\php\\php-!choosen_php_version!\\php.ini
+	IF EXIST .\\php\\php-!choosen_php_version!\\php.ini-recommended (
+		POWERSHELL -Command ^
+			"$content = Get-Content .\\php\\php-!choosen_php_version!\\php.ini-recommended | Out-String;" ^
+			"$content = [regex]::Replace($content, ';extension=', 'extension=');" ^
+			"$content = [regex]::Replace($content, ';?extension_dir = \"./\"', 'extension_dir = \"%CD%\\php\\php-!choosen_php_version!\\ext\"');" ^
+			"Write-Output $content | Set-Content .\\php\\php-!choosen_php_version!\\php.ini"
 	)
 	ECHO PHP !choosen_php_version! installed.
 	ECHO Update default php version...
@@ -447,7 +455,7 @@ CALL :php_get_local_versions
 IF !php_local_versions_count! LEQ 0 (
 	ECHO PHP not installed.
 	PAUSE
-	GOTO :php_menu
+	GOTO php_menu
 )
 
 POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'php=php-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"php-$ver\"} else {Write-Output php-0.0.0}" > .\\tmp\\temp.txt
@@ -484,14 +492,14 @@ IF "!installed!" == "true" (
 	ECHO PHP-!choosen_php_version! is not installed.
 )
 PAUSE
-GOTO :php_menu
+GOTO php_menu
 
 :php_uninstall
 CALL :php_get_local_versions
 IF !php_local_versions_count! LEQ 0 (
 	ECHO PHP not installed.
 	PAUSE
-	GOTO :php_menu
+	GOTO php_menu
 )
 
 FOR /L %%j IN (1,1,!php_local_versions_count!) DO (
@@ -504,7 +512,7 @@ FOR /f "tokens=* delims=" %%a IN ("!choosen_php_version!") DO SET choosen_php_ve
 IF "!choosen_php_version!" == "" (
   ECHO Version can't be empty
   PAUSE
-  GOTO mariadb_menu
+  GOTO php_menu
 )
 
 SET installed=false
@@ -536,7 +544,7 @@ IF "!installed!" == "true" (
 )
 
 PAUSE
-GOTO :php_menu
+GOTO php_menu
 
 :apache_menu
 CLS
@@ -584,12 +592,14 @@ IF EXIST .\\apache\\conf\\httpd.conf (
 		POWERSHELL -Command ^
 			"$content=(Get-Content .\\apache\\conf\\httpd.conf | Out-String);" ^
 			"$content=[regex]::Replace($content, \"#?LoadModule php\d?_module '.*'\", \"#LoadModule php_module ''\");" ^
+			"$content=[regex]::Replace($content, \"#?PHPIniDir '.*'\", \"#PHPIniDir ''\");" ^
 			"Write-Output $content | Set-Content .\\apache\\conf\\httpd.conf"
 	) ELSE (
 		POWERSHELL -Command ^
 			"$dll=(Get-ChildItem -Path .\\php\\!php_version! -Filter *apache*.dll | Select-Object -First 1).Name;" ^
 			"$content=(Get-Content .\\apache\\conf\\httpd.conf | Out-String);" ^
 			"$content=[regex]::Replace($content, \"#?LoadModule php\d?_module '.*'\", \"LoadModule php!phpmod!_module '%CD%\\php\\!php_version!\\$dll'\");" ^
+			"$content=[regex]::Replace($content, \"#?PHPIniDir '.*'\", \"PHPIniDir '%CD%\\php\\!php_version!'\");" ^
 			"Write-Output $content | Set-Content .\\apache\\conf\\httpd.conf"
 	)
 )
@@ -690,7 +700,7 @@ IF EXIST .\\apache\\bin\\httpd.exe (
 	POWERSHELL -Command ^
 		"$content=Get-Content .\\apache\\conf\\httpd.conf | Out-String;" ^
 		"$content=[regex]::Replace($content, 'Define SRVROOT \".+\"', 'Define SRVROOT \"%CD%\\apache\"');" ^
-		"$content=$content -replace \"LoadModule actions_module modules/mod_actions.so\", \"LoadModule php_module ''`nLoadModule actions_module modules/mod_actions.so\";" ^
+		"$content=$content -replace \"LoadModule actions_module modules/mod_actions.so\", \"#LoadModule php_module ''`n#PHPIniDir ''`nLoadModule actions_module modules/mod_actions.so\";" ^
 		"$content=[regex]::Replace($content, '#ServerName www.example.com:80', 'ServerName localhost:80');" ^
 		"$content=[regex]::Replace($content, '\${SRVROOT}/htdocs', '%CD%\\htdocs');" ^
 		"$content=[regex]::Replace($content, 'DirectoryIndex index.html', 'DirectoryIndex index.php index.html index.htm');" ^
@@ -1121,7 +1131,7 @@ CALL :mariadb_get_local_versions
 IF !mariadb_local_versions_count! LEQ 0 (
 	ECHO MariaDB not installed.
 	PAUSE
-	GOTO :mariadb_menu
+	GOTO mariadb_menu
 )
 
 POWERSHELL -Command "$content=Get-Content -Path .\\default.conf | Out-String; $matches=[regex]::matches($content, 'mariadb=mariadb-([0-9\.]+)'); if($matches.Count -gt 0) {$ver=$matches.Groups[1].Value; Write-Output \"mariadb-$ver\"} else {Write-Output mariadb-0.0.0}" > .\\tmp\\temp.txt
@@ -1237,7 +1247,7 @@ CALL :mariadb_get_local_versions
 IF !mariadb_local_versions_count! LEQ 0 (
 	ECHO MariaDB not installed.
 	PAUSE
-	GOTO :mariadb_menu
+	GOTO mariadb_menu
 )
 FOR /L %%j IN (1,1,!mariadb_local_versions_count!) DO (
 	ECHO MariaDB-!mariadb_local_versions[%%j]!
