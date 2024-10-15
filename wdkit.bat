@@ -293,7 +293,14 @@ EXIT /b
 
 :php_install
 CALL :php_print_versions
+SET choosen_php_version=
 SET /p choosen_php_version=Download PHP Version: 
+FOR /f "tokens=* delims=" %%a IN ("!choosen_php_version!") DO SET choosen_php_version=%%~a
+IF "!choosen_php_version!" == "" (
+  ECHO Version can't be empty
+  PAUSE
+  GOTO php_menu
+)
 SET archived=true
 
 ECHO Validating version..
@@ -459,7 +466,7 @@ FOR /f "tokens=* delims=" %%a IN ("!choosen_php_version!") DO SET choosen_php_ve
 IF "!choosen_php_version!" == "" (
   ECHO Version can't be empty
   PAUSE
-  GOTO mariadb_menu
+  GOTO php_menu
 )
 
 SET installed=false
@@ -738,6 +745,7 @@ FOR /f %%a IN (.\\tmp\temp.txt) DO (
 DEL .\\tmp\temp.txt
 IF !count! GTR 0 (
 	POWERSHELL -Command "Stop-Process -Id (Get-Process -Name httpd).Id -Force"
+	DEL .\\apache\\logs\\httpd.pid
 )
 CALL :apache_status
 PAUSE
@@ -758,6 +766,7 @@ FOR /f %%a IN (.\\tmp\temp.txt) DO (
 DEL .\\tmp\temp.txt
 IF !count! GTR 0 (
 	POWERSHELL -Command "Stop-Process -Id (Get-Process -Name httpd).Id -Force"
+	DEL .\\apache\\logs\\httpd.pid
 )
 IF EXIST .\\apache\\bin\\httpd.exe (START /min /b .\\apache\\bin\\httpd.exe)
 CALL :apache_status
@@ -782,6 +791,7 @@ IF "!y!" == "true" (
 	DEL .\\tmp\temp.txt
 	IF !count! GTR 0 (
 		POWERSHELL -Command "Stop-Process -Id (Get-Process -Name httpd).Id -Force"
+		DEL .\\apache\\logs\\httpd.pid
 	)
 	IF EXIST .\\apache (
 		RMDIR /S /Q .\\apache
@@ -1286,3 +1296,5 @@ GOTO mariadb_menu
 
 :exit
 exit /b 0
+
+ENDLOCAL
