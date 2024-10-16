@@ -264,6 +264,14 @@ IF "!php_ver!"=="php-0.0.0" (
 			POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-!php_local_versions[%php_local_versions_count%]!' | Set-Content .\\default.conf"
 		)
 	) ELSE (
+		POWERSHELL -Command "FINDSTR /i 'php=' default.conf" > .\\tmp\temp.txt
+		SET /p  php_line_conf=<.\\tmp\temp.txt
+		IF "!php_line_conf!" == "" (
+			ECHO php= >> default.conf
+		) ELSE (
+			POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=' | Set-Content .\\default.conf"
+		)
+		CALL :apache_set_php_module
 		ECHO PHP not installed.
 		PAUSE
 		GOTO php_menu
@@ -283,8 +291,8 @@ IF !php_path! NEQ 0 (
 	FOR /F "delims=" %%a IN (.\\tmp\\temp.txt) DO (
 		POWERSHELL -Command "$matches=[regex]::matches('%%a', '^(.*)\.(exe|bat)'); $fname=$matches.Groups[1].Value; Write-Output \"@echo off`n!php_path!\%%a !%%*\" | Out-File -FilePath \".\php\bin\$fname.bat\" -Encoding ASCII"
 	)
-	CALL :apache_set_php_module
 	ECHO !php_ver! set as default.
+	CALL :apache_set_php_module
 ) ELSE (
 	POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'php=(php-([0-9.]*))?', 'php=php-!php_local_versions[%php_local_versions_count%]!' | Set-Content .\\default.conf"
 	GOTO php_create_default_bin
@@ -925,6 +933,11 @@ IF "!mariadb_ver!"=="mariadb-0.0.0" (
 		)
 	) ELSE (
 		ECHO MariaDB not installed.
+		IF "!mariadb_line_conf!" == "" (
+			ECHO mariadb= >> default.conf
+		) ELSE (
+			POWERSHELL -Command "(Get-Content .\\default.conf) -replace 'mariadb=(mariadb-([0-9.]*))?', 'mariadb=' | Set-Content .\\default.conf"
+		)
 		PAUSE
 		GOTO mariadb_menu
 	)
@@ -1101,9 +1114,10 @@ ECHO Unzipping...
 CALL :unzipper ".\\tmp\\mariadb-!choosen_mariadb_version!.zip\\!dname!" ".\\mariadb\\mariadb-!choosen_mariadb_version!"
 
 IF EXIST .\\mariadb\\mariadb-!choosen_mariadb_version!\\bin\\mysqld.exe (
-	POWERSHELL -Command ".\\mariadb\\mariadb-!choosen_mariadb_version!\\bin\\mysql_install_db.exe"
+	IF NOT EXIST .\\mariadb\\mariadb-!choosen_mariadb_version!\\data (POWERSHELL -Command ".\\mariadb\\mariadb-!choosen_mariadb_version!\\bin\\mysql_install_db.exe -s -d .\\mariadb\\mariadb-!choosen_mariadb_version!\\data")
 	IF EXIST .\\mariadb\\mariadb-!choosen_mariadb_version!\\data (
-		XCOPY /s /i .\\mariadb\\mariadb-!choosen_mariadb_version!\\data .\\mariadb\\mariadb-!choosen_mariadb_version!\\backup
+		XCOPY /s /i /q .\\mariadb\\mariadb-!choosen_mariadb_version!\\data .\\mariadb\\mariadb-!choosen_mariadb_version!\\backup > .\\tmp\\temp.txt
+		DEL .\\tmp\\temp.txt
 	)
 	CALL :mariadb_create_default_bin
 	ECHO MariaDB-!choosen_mariadb_version! installed.
